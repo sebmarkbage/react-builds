@@ -3868,8 +3868,12 @@ var ReactNativeFiberHostComponent =
       if (typeof relativeToNativeNode === "number") {
         // Already a node handle
         relativeNode = relativeToNativeNode;
-      } else if (relativeToNativeNode._nativeTag) {
-        relativeNode = relativeToNativeNode._nativeTag;
+      } else {
+        var nativeNode = relativeToNativeNode;
+
+        if (nativeNode._nativeTag) {
+          relativeNode = nativeNode._nativeTag;
+        }
       }
 
       if (relativeNode == null) {

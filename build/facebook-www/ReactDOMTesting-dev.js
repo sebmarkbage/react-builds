@@ -15,9 +15,21 @@ if (__DEV__) {
   (function() {
 "use strict";
 
-var React = require("react");
 var Scheduler = require("scheduler");
+var React = require("react");
 var checkPropTypes = require("prop-types/checkPropTypes");
+
+var enableProfilerTimer = false;
+var enableFundamentalAPI = false;
+var warnAboutStringRefs = false;
+
+function addUserTimingListener() {
+  {
+    {
+      throw Error("Not implemented.");
+    }
+  }
+} // Flow magic to verify the exports of this file match the original version.
 
 // This refers to a WWW module.
 var warningWWW = require("warning");
@@ -81,14 +93,6 @@ function printWarning(level, format, args) {
     args.unshift(format);
     args.unshift(false);
     warningWWW.apply(null, args);
-  }
-}
-
-if (!React) {
-  {
-    throw Error(
-      "ReactDOM was loaded before React. Make sure you load the React package before loading ReactDOM."
-    );
   }
 }
 
@@ -298,6 +302,208 @@ function executeDispatchesInOrder(event) {
   event._dispatchListeners = null;
   event._dispatchInstances = null;
 }
+
+var restoreImpl = null;
+var restoreTarget = null;
+var restoreQueue = null;
+
+function restoreStateOfTarget(target) {
+  // We perform this translation at the end of the event loop so that we
+  // always receive the correct fiber here
+  var internalInstance = getInstanceFromNode(target);
+
+  if (!internalInstance) {
+    // Unmounted
+    return;
+  }
+
+  if (!(typeof restoreImpl === "function")) {
+    {
+      throw Error(
+        "setRestoreImplementation() needs to be called to handle a target for controlled events. This error is likely caused by a bug in React. Please file an issue."
+      );
+    }
+  }
+
+  var stateNode = internalInstance.stateNode; // Guard against Fiber being unmounted.
+
+  if (stateNode) {
+    var _props = getFiberCurrentPropsFromNode(stateNode);
+
+    restoreImpl(internalInstance.stateNode, internalInstance.type, _props);
+  }
+}
+
+function setRestoreImplementation(impl) {
+  restoreImpl = impl;
+}
+function enqueueStateRestore(target) {
+  if (restoreTarget) {
+    if (restoreQueue) {
+      restoreQueue.push(target);
+    } else {
+      restoreQueue = [target];
+    }
+  } else {
+    restoreTarget = target;
+  }
+}
+function needsStateRestore() {
+  return restoreTarget !== null || restoreQueue !== null;
+}
+function restoreStateIfNeeded() {
+  if (!restoreTarget) {
+    return;
+  }
+
+  var target = restoreTarget;
+  var queuedTargets = restoreQueue;
+  restoreTarget = null;
+  restoreQueue = null;
+  restoreStateOfTarget(target);
+
+  if (queuedTargets) {
+    for (var i = 0; i < queuedTargets.length; i++) {
+      restoreStateOfTarget(queuedTargets[i]);
+    }
+  }
+}
+
+// the renderer. Such as when we're dispatching events or if third party
+// libraries need to call batchedUpdates. Eventually, this API will go away when
+// everything is batched by default. We'll then have a similar API to opt-out of
+// scheduled work and instead do synchronous work.
+// Defaults
+
+var batchedUpdatesImpl = function(fn, bookkeeping) {
+  return fn(bookkeeping);
+};
+
+var discreteUpdatesImpl = function(fn, a, b, c, d) {
+  return fn(a, b, c, d);
+};
+
+var flushDiscreteUpdatesImpl = function() {};
+
+var batchedEventUpdatesImpl = batchedUpdatesImpl;
+var isInsideEventHandler = false;
+var isBatchingEventUpdates = false;
+
+function finishEventHandler() {
+  // Here we wait until all updates have propagated, which is important
+  // when using controlled components within layers:
+  // https://github.com/facebook/react/issues/1698
+  // Then we restore state of any controlled component.
+  var controlledComponentsHavePendingUpdates = needsStateRestore();
+
+  if (controlledComponentsHavePendingUpdates) {
+    // If a controlled event was fired, we may need to restore the state of
+    // the DOM node back to the controlled value. This is necessary when React
+    // bails out of the update without touching the DOM.
+    flushDiscreteUpdatesImpl();
+    restoreStateIfNeeded();
+  }
+}
+
+function batchedUpdates(fn, bookkeeping) {
+  if (isInsideEventHandler) {
+    // If we are currently inside another batch, we need to wait until it
+    // fully completes before restoring state.
+    return fn(bookkeeping);
+  }
+
+  isInsideEventHandler = true;
+
+  try {
+    return batchedUpdatesImpl(fn, bookkeeping);
+  } finally {
+    isInsideEventHandler = false;
+    finishEventHandler();
+  }
+}
+function batchedEventUpdates(fn, a, b) {
+  if (isBatchingEventUpdates) {
+    // If we are currently inside another batch, we need to wait until it
+    // fully completes before restoring state.
+    return fn(a, b);
+  }
+
+  isBatchingEventUpdates = true;
+
+  try {
+    return batchedEventUpdatesImpl(fn, a, b);
+  } finally {
+    isBatchingEventUpdates = false;
+    finishEventHandler();
+  }
+} // This is for the React Flare event system
+
+function executeUserEventHandler(fn, value) {
+  var previouslyInEventHandler = isInsideEventHandler;
+
+  try {
+    isInsideEventHandler = true;
+    var type = typeof value === "object" && value !== null ? value.type : "";
+    invokeGuardedCallbackAndCatchFirstError(type, fn, undefined, value);
+  } finally {
+    isInsideEventHandler = previouslyInEventHandler;
+  }
+}
+function discreteUpdates(fn, a, b, c, d) {
+  var prevIsInsideEventHandler = isInsideEventHandler;
+  isInsideEventHandler = true;
+
+  try {
+    return discreteUpdatesImpl(fn, a, b, c, d);
+  } finally {
+    isInsideEventHandler = prevIsInsideEventHandler;
+
+    if (!isInsideEventHandler) {
+      finishEventHandler();
+    }
+  }
+}
+var lastFlushedEventTimeStamp = 0;
+function flushDiscreteUpdatesIfNeeded(timeStamp) {
+  // event.timeStamp isn't overly reliable due to inconsistencies in
+  // how different browsers have historically provided the time stamp.
+  // Some browsers provide high-resolution time stamps for all events,
+  // some provide low-resolution time stamps for all events. FF < 52
+  // even mixes both time stamps together. Some browsers even report
+  // negative time stamps or time stamps that are 0 (iOS9) in some cases.
+  // Given we are only comparing two time stamps with equality (!==),
+  // we are safe from the resolution differences. If the time stamp is 0
+  // we bail-out of preventing the flush, which can affect semantics,
+  // such as if an earlier flush removes or adds event listeners that
+  // are fired in the subsequent flush. However, this is the same
+  // behaviour as we had before this change, so the risks are low.
+  if (
+    !isInsideEventHandler &&
+    (timeStamp === 0 || lastFlushedEventTimeStamp !== timeStamp)
+  ) {
+    lastFlushedEventTimeStamp = timeStamp;
+    flushDiscreteUpdatesImpl();
+  }
+}
+function setBatchingImplementation(
+  _batchedUpdatesImpl,
+  _discreteUpdatesImpl,
+  _flushDiscreteUpdatesImpl,
+  _batchedEventUpdatesImpl
+) {
+  batchedUpdatesImpl = _batchedUpdatesImpl;
+  discreteUpdatesImpl = _discreteUpdatesImpl;
+  flushDiscreteUpdatesImpl = _flushDiscreteUpdatesImpl;
+  batchedEventUpdatesImpl = _batchedEventUpdatesImpl;
+}
+
+var PLUGIN_EVENT_SYSTEM = 1;
+var RESPONDER_EVENT_SYSTEM = 1 << 1;
+var IS_PASSIVE = 1 << 2;
+var IS_ACTIVE = 1 << 3;
+var PASSIVE_NOT_SUPPORTED = 1 << 4;
+var IS_REPLAYED = 1 << 5;
+var IS_FIRST_ANCESTOR = 1 << 6;
 
 var FunctionComponent = 0;
 var ClassComponent = 1;
@@ -894,758 +1100,6 @@ var canUseDOM = !!(
 function endsWith(subject, search) {
   var length = subject.length;
   return subject.substring(length - search.length, length) === search;
-}
-
-var PLUGIN_EVENT_SYSTEM = 1;
-var RESPONDER_EVENT_SYSTEM = 1 << 1;
-var IS_PASSIVE = 1 << 2;
-var IS_ACTIVE = 1 << 3;
-var PASSIVE_NOT_SUPPORTED = 1 << 4;
-var IS_REPLAYED = 1 << 5;
-var IS_FIRST_ANCESTOR = 1 << 6;
-
-var restoreImpl = null;
-var restoreTarget = null;
-var restoreQueue = null;
-
-function restoreStateOfTarget(target) {
-  // We perform this translation at the end of the event loop so that we
-  // always receive the correct fiber here
-  var internalInstance = getInstanceFromNode(target);
-
-  if (!internalInstance) {
-    // Unmounted
-    return;
-  }
-
-  if (!(typeof restoreImpl === "function")) {
-    {
-      throw Error(
-        "setRestoreImplementation() needs to be called to handle a target for controlled events. This error is likely caused by a bug in React. Please file an issue."
-      );
-    }
-  }
-
-  var stateNode = internalInstance.stateNode; // Guard against Fiber being unmounted.
-
-  if (stateNode) {
-    var _props = getFiberCurrentPropsFromNode(stateNode);
-
-    restoreImpl(internalInstance.stateNode, internalInstance.type, _props);
-  }
-}
-
-function setRestoreImplementation(impl) {
-  restoreImpl = impl;
-}
-function enqueueStateRestore(target) {
-  if (restoreTarget) {
-    if (restoreQueue) {
-      restoreQueue.push(target);
-    } else {
-      restoreQueue = [target];
-    }
-  } else {
-    restoreTarget = target;
-  }
-}
-function needsStateRestore() {
-  return restoreTarget !== null || restoreQueue !== null;
-}
-function restoreStateIfNeeded() {
-  if (!restoreTarget) {
-    return;
-  }
-
-  var target = restoreTarget;
-  var queuedTargets = restoreQueue;
-  restoreTarget = null;
-  restoreQueue = null;
-  restoreStateOfTarget(target);
-
-  if (queuedTargets) {
-    for (var i = 0; i < queuedTargets.length; i++) {
-      restoreStateOfTarget(queuedTargets[i]);
-    }
-  }
-}
-
-var enableProfilerTimer = false;
-var enableFundamentalAPI = false;
-var warnAboutStringRefs = false;
-
-// the renderer. Such as when we're dispatching events or if third party
-// libraries need to call batchedUpdates. Eventually, this API will go away when
-// everything is batched by default. We'll then have a similar API to opt-out of
-// scheduled work and instead do synchronous work.
-// Defaults
-
-var batchedUpdatesImpl = function(fn, bookkeeping) {
-  return fn(bookkeeping);
-};
-
-var discreteUpdatesImpl = function(fn, a, b, c, d) {
-  return fn(a, b, c, d);
-};
-
-var flushDiscreteUpdatesImpl = function() {};
-
-var batchedEventUpdatesImpl = batchedUpdatesImpl;
-var isInsideEventHandler = false;
-var isBatchingEventUpdates = false;
-
-function finishEventHandler() {
-  // Here we wait until all updates have propagated, which is important
-  // when using controlled components within layers:
-  // https://github.com/facebook/react/issues/1698
-  // Then we restore state of any controlled component.
-  var controlledComponentsHavePendingUpdates = needsStateRestore();
-
-  if (controlledComponentsHavePendingUpdates) {
-    // If a controlled event was fired, we may need to restore the state of
-    // the DOM node back to the controlled value. This is necessary when React
-    // bails out of the update without touching the DOM.
-    flushDiscreteUpdatesImpl();
-    restoreStateIfNeeded();
-  }
-}
-
-function batchedUpdates(fn, bookkeeping) {
-  if (isInsideEventHandler) {
-    // If we are currently inside another batch, we need to wait until it
-    // fully completes before restoring state.
-    return fn(bookkeeping);
-  }
-
-  isInsideEventHandler = true;
-
-  try {
-    return batchedUpdatesImpl(fn, bookkeeping);
-  } finally {
-    isInsideEventHandler = false;
-    finishEventHandler();
-  }
-}
-function batchedEventUpdates(fn, a, b) {
-  if (isBatchingEventUpdates) {
-    // If we are currently inside another batch, we need to wait until it
-    // fully completes before restoring state.
-    return fn(a, b);
-  }
-
-  isBatchingEventUpdates = true;
-
-  try {
-    return batchedEventUpdatesImpl(fn, a, b);
-  } finally {
-    isBatchingEventUpdates = false;
-    finishEventHandler();
-  }
-} // This is for the React Flare event system
-
-function executeUserEventHandler(fn, value) {
-  var previouslyInEventHandler = isInsideEventHandler;
-
-  try {
-    isInsideEventHandler = true;
-    var type = typeof value === "object" && value !== null ? value.type : "";
-    invokeGuardedCallbackAndCatchFirstError(type, fn, undefined, value);
-  } finally {
-    isInsideEventHandler = previouslyInEventHandler;
-  }
-}
-function discreteUpdates(fn, a, b, c, d) {
-  var prevIsInsideEventHandler = isInsideEventHandler;
-  isInsideEventHandler = true;
-
-  try {
-    return discreteUpdatesImpl(fn, a, b, c, d);
-  } finally {
-    isInsideEventHandler = prevIsInsideEventHandler;
-
-    if (!isInsideEventHandler) {
-      finishEventHandler();
-    }
-  }
-}
-var lastFlushedEventTimeStamp = 0;
-function flushDiscreteUpdatesIfNeeded(timeStamp) {
-  // event.timeStamp isn't overly reliable due to inconsistencies in
-  // how different browsers have historically provided the time stamp.
-  // Some browsers provide high-resolution time stamps for all events,
-  // some provide low-resolution time stamps for all events. FF < 52
-  // even mixes both time stamps together. Some browsers even report
-  // negative time stamps or time stamps that are 0 (iOS9) in some cases.
-  // Given we are only comparing two time stamps with equality (!==),
-  // we are safe from the resolution differences. If the time stamp is 0
-  // we bail-out of preventing the flush, which can affect semantics,
-  // such as if an earlier flush removes or adds event listeners that
-  // are fired in the subsequent flush. However, this is the same
-  // behaviour as we had before this change, so the risks are low.
-  if (
-    !isInsideEventHandler &&
-    (timeStamp === 0 || lastFlushedEventTimeStamp !== timeStamp)
-  ) {
-    lastFlushedEventTimeStamp = timeStamp;
-    flushDiscreteUpdatesImpl();
-  }
-}
-function setBatchingImplementation(
-  _batchedUpdatesImpl,
-  _discreteUpdatesImpl,
-  _flushDiscreteUpdatesImpl,
-  _batchedEventUpdatesImpl
-) {
-  batchedUpdatesImpl = _batchedUpdatesImpl;
-  discreteUpdatesImpl = _discreteUpdatesImpl;
-  flushDiscreteUpdatesImpl = _flushDiscreteUpdatesImpl;
-  batchedEventUpdatesImpl = _batchedEventUpdatesImpl;
-}
-
-var DiscreteEvent = 0;
-var UserBlockingEvent = 1;
-var ContinuousEvent = 2;
-
-var UserBlockingPriority = Scheduler.unstable_UserBlockingPriority,
-  runWithPriority = Scheduler.unstable_runWithPriority;
-var listenToResponderEventTypesImpl;
-function setListenToResponderEventTypes(_listenToResponderEventTypesImpl) {
-  listenToResponderEventTypesImpl = _listenToResponderEventTypesImpl;
-}
-var rootEventTypesToEventResponderInstances = new Map();
-var DoNotPropagateToNextResponder = 0;
-var PropagateToNextResponder = 1;
-var currentTimeStamp = 0;
-var currentInstance = null;
-var currentDocument = null;
-var currentPropagationBehavior = DoNotPropagateToNextResponder;
-var eventResponderContext = {
-  dispatchEvent: function(eventValue, eventListener, eventPriority) {
-    validateResponderContext();
-    validateEventValue(eventValue);
-
-    switch (eventPriority) {
-      case DiscreteEvent: {
-        flushDiscreteUpdatesIfNeeded(currentTimeStamp);
-        discreteUpdates(function() {
-          return executeUserEventHandler(eventListener, eventValue);
-        });
-        break;
-      }
-
-      case UserBlockingEvent: {
-        runWithPriority(UserBlockingPriority, function() {
-          return executeUserEventHandler(eventListener, eventValue);
-        });
-        break;
-      }
-
-      case ContinuousEvent: {
-        executeUserEventHandler(eventListener, eventValue);
-        break;
-      }
-    }
-  },
-  isTargetWithinResponder: function(target) {
-    validateResponderContext();
-
-    if (target != null) {
-      var fiber = getClosestInstanceFromNode(target);
-      var responderFiber = currentInstance.fiber;
-
-      while (fiber !== null) {
-        if (fiber === responderFiber || fiber.alternate === responderFiber) {
-          return true;
-        }
-
-        fiber = fiber.return;
-      }
-    }
-
-    return false;
-  },
-  isTargetWithinResponderScope: function(target) {
-    validateResponderContext();
-    var componentInstance = currentInstance;
-    var responder = componentInstance.responder;
-
-    if (target != null) {
-      var fiber = getClosestInstanceFromNode(target);
-      var responderFiber = currentInstance.fiber;
-
-      while (fiber !== null) {
-        if (fiber === responderFiber || fiber.alternate === responderFiber) {
-          return true;
-        }
-
-        if (doesFiberHaveResponder(fiber, responder)) {
-          return false;
-        }
-
-        fiber = fiber.return;
-      }
-    }
-
-    return false;
-  },
-  isTargetWithinNode: function(childTarget, parentTarget) {
-    validateResponderContext();
-    var childFiber = getClosestInstanceFromNode(childTarget);
-    var parentFiber = getClosestInstanceFromNode(parentTarget);
-
-    if (childFiber != null && parentFiber != null) {
-      var parentAlternateFiber = parentFiber.alternate;
-      var node = childFiber;
-
-      while (node !== null) {
-        if (node === parentFiber || node === parentAlternateFiber) {
-          return true;
-        }
-
-        node = node.return;
-      }
-
-      return false;
-    } // Fallback to DOM APIs
-
-    return parentTarget.contains(childTarget);
-  },
-  addRootEventTypes: function(rootEventTypes) {
-    validateResponderContext();
-    listenToResponderEventTypesImpl(rootEventTypes, currentDocument);
-
-    for (var i = 0; i < rootEventTypes.length; i++) {
-      var rootEventType = rootEventTypes[i];
-      var eventResponderInstance = currentInstance;
-      DEPRECATED_registerRootEventType(rootEventType, eventResponderInstance);
-    }
-  },
-  removeRootEventTypes: function(rootEventTypes) {
-    validateResponderContext();
-
-    for (var i = 0; i < rootEventTypes.length; i++) {
-      var rootEventType = rootEventTypes[i];
-      var rootEventResponders = rootEventTypesToEventResponderInstances.get(
-        rootEventType
-      );
-      var rootEventTypesSet = currentInstance.rootEventTypes;
-
-      if (rootEventTypesSet !== null) {
-        rootEventTypesSet.delete(rootEventType);
-      }
-
-      if (rootEventResponders !== undefined) {
-        rootEventResponders.delete(currentInstance);
-      }
-    }
-  },
-  getActiveDocument: getActiveDocument,
-  objectAssign: Object.assign,
-  getTimeStamp: function() {
-    validateResponderContext();
-    return currentTimeStamp;
-  },
-  isTargetWithinHostComponent: function(target, elementType) {
-    validateResponderContext();
-    var fiber = getClosestInstanceFromNode(target);
-
-    while (fiber !== null) {
-      if (fiber.tag === HostComponent && fiber.type === elementType) {
-        return true;
-      }
-
-      fiber = fiber.return;
-    }
-
-    return false;
-  },
-  continuePropagation: function() {
-    currentPropagationBehavior = PropagateToNextResponder;
-  },
-  enqueueStateRestore: enqueueStateRestore,
-  getResponderNode: function() {
-    validateResponderContext();
-    var responderFiber = currentInstance.fiber;
-
-    if (responderFiber.tag === ScopeComponent) {
-      return null;
-    }
-
-    return responderFiber.stateNode;
-  }
-};
-
-function validateEventValue(eventValue) {
-  if (typeof eventValue === "object" && eventValue !== null) {
-    var target = eventValue.target,
-      type = eventValue.type,
-      timeStamp = eventValue.timeStamp;
-
-    if (target == null || type == null || timeStamp == null) {
-      throw new Error(
-        'context.dispatchEvent: "target", "timeStamp", and "type" fields on event object are required.'
-      );
-    }
-
-    var showWarning = function(name) {
-      {
-        error(
-          "%s is not available on event objects created from event responder modules (React Flare). " +
-            'Try wrapping in a conditional, i.e. `if (event.type !== "press") { event.%s }`',
-          name,
-          name
-        );
-      }
-    };
-
-    eventValue.isDefaultPrevented = function() {
-      {
-        showWarning("isDefaultPrevented()");
-      }
-    };
-
-    eventValue.isPropagationStopped = function() {
-      {
-        showWarning("isPropagationStopped()");
-      }
-    }; // $FlowFixMe: we don't need value, Flow thinks we do
-
-    Object.defineProperty(eventValue, "nativeEvent", {
-      get: function() {
-        {
-          showWarning("nativeEvent");
-        }
-      }
-    });
-  }
-}
-
-function doesFiberHaveResponder(fiber, responder) {
-  var tag = fiber.tag;
-
-  if (tag === HostComponent || tag === ScopeComponent) {
-    var dependencies = fiber.dependencies;
-
-    if (dependencies !== null) {
-      var respondersMap = dependencies.responders;
-
-      if (respondersMap !== null && respondersMap.has(responder)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function getActiveDocument() {
-  return currentDocument;
-}
-
-function createDOMResponderEvent(
-  topLevelType,
-  nativeEvent,
-  nativeEventTarget,
-  passive
-) {
-  var _ref = nativeEvent,
-    buttons = _ref.buttons,
-    pointerType = _ref.pointerType;
-  var eventPointerType = "";
-
-  if (pointerType !== undefined) {
-    eventPointerType = pointerType;
-  } else if (nativeEvent.key !== undefined) {
-    eventPointerType = "keyboard";
-  } else if (buttons !== undefined) {
-    eventPointerType = "mouse";
-  } else if (nativeEvent.changedTouches !== undefined) {
-    eventPointerType = "touch";
-  }
-
-  return {
-    nativeEvent: nativeEvent,
-    passive: passive,
-    pointerType: eventPointerType,
-    target: nativeEventTarget,
-    type: topLevelType
-  };
-}
-
-function responderEventTypesContainType(eventTypes, type, isPassive) {
-  for (var i = 0, len = eventTypes.length; i < len; i++) {
-    var eventType = eventTypes[i];
-
-    if (eventType === type || (!isPassive && eventType === type + "_active")) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function validateResponderTargetEventTypes(eventType, responder, isPassive) {
-  var targetEventTypes = responder.targetEventTypes; // Validate the target event type exists on the responder
-
-  if (targetEventTypes !== null) {
-    return responderEventTypesContainType(
-      targetEventTypes,
-      eventType,
-      isPassive
-    );
-  }
-
-  return false;
-}
-
-function traverseAndHandleEventResponderInstances(
-  topLevelType,
-  targetFiber,
-  nativeEvent,
-  nativeEventTarget,
-  eventSystemFlags
-) {
-  var isPassiveEvent = (eventSystemFlags & IS_PASSIVE) !== 0;
-  var isPassiveSupported = (eventSystemFlags & PASSIVE_NOT_SUPPORTED) === 0;
-  var isPassive = isPassiveEvent || !isPassiveSupported; // Trigger event responders in this order:
-  // - Bubble target responder phase
-  // - Root responder phase
-
-  var visitedResponders = new Set();
-  var responderEvent = createDOMResponderEvent(
-    topLevelType,
-    nativeEvent,
-    nativeEventTarget,
-    isPassiveEvent
-  );
-  var node = targetFiber;
-  var insidePortal = false;
-
-  while (node !== null) {
-    var _node = node,
-      dependencies = _node.dependencies,
-      tag = _node.tag;
-
-    if (tag === HostPortal) {
-      insidePortal = true;
-    } else if (
-      (tag === HostComponent || tag === ScopeComponent) &&
-      dependencies !== null
-    ) {
-      var respondersMap = dependencies.responders;
-
-      if (respondersMap !== null) {
-        var responderInstances = Array.from(respondersMap.values());
-
-        for (var i = 0, length = responderInstances.length; i < length; i++) {
-          var responderInstance = responderInstances[i];
-          var props = responderInstance.props,
-            responder = responderInstance.responder,
-            state = responderInstance.state;
-
-          if (
-            !visitedResponders.has(responder) &&
-            validateResponderTargetEventTypes(
-              topLevelType,
-              responder,
-              isPassive
-            ) &&
-            (!insidePortal || responder.targetPortalPropagation)
-          ) {
-            visitedResponders.add(responder);
-            var onEvent = responder.onEvent;
-
-            if (onEvent !== null) {
-              currentInstance = responderInstance;
-              onEvent(responderEvent, eventResponderContext, props, state);
-
-              if (currentPropagationBehavior === PropagateToNextResponder) {
-                visitedResponders.delete(responder);
-                currentPropagationBehavior = DoNotPropagateToNextResponder;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    node = node.return;
-  } // Root phase
-
-  var passive = rootEventTypesToEventResponderInstances.get(topLevelType);
-  var rootEventResponderInstances = [];
-
-  if (passive !== undefined) {
-    rootEventResponderInstances.push.apply(
-      rootEventResponderInstances,
-      Array.from(passive)
-    );
-  }
-
-  if (!isPassive) {
-    var active = rootEventTypesToEventResponderInstances.get(
-      topLevelType + "_active"
-    );
-
-    if (active !== undefined) {
-      rootEventResponderInstances.push.apply(
-        rootEventResponderInstances,
-        Array.from(active)
-      );
-    }
-  }
-
-  if (rootEventResponderInstances.length > 0) {
-    var _responderInstances = Array.from(rootEventResponderInstances);
-
-    for (var _i = 0; _i < _responderInstances.length; _i++) {
-      var _responderInstance = _responderInstances[_i];
-      var _props = _responderInstance.props,
-        _responder = _responderInstance.responder,
-        _state = _responderInstance.state;
-      var onRootEvent = _responder.onRootEvent;
-
-      if (onRootEvent !== null) {
-        currentInstance = _responderInstance;
-        onRootEvent(responderEvent, eventResponderContext, _props, _state);
-      }
-    }
-  }
-}
-
-function mountEventResponder(responder, responderInstance, props, state) {
-  var onMount = responder.onMount;
-
-  if (onMount !== null) {
-    var previousInstance = currentInstance;
-    currentInstance = responderInstance;
-
-    try {
-      onMount(eventResponderContext, props, state);
-    } finally {
-      currentInstance = previousInstance;
-    }
-  }
-}
-function unmountEventResponder(responderInstance) {
-  var responder = responderInstance.responder;
-  var onUnmount = responder.onUnmount;
-
-  if (onUnmount !== null) {
-    var props = responderInstance.props,
-      state = responderInstance.state;
-    var previousInstance = currentInstance;
-    currentInstance = responderInstance;
-
-    try {
-      onUnmount(eventResponderContext, props, state);
-    } finally {
-      currentInstance = previousInstance;
-    }
-  }
-
-  var rootEventTypesSet = responderInstance.rootEventTypes;
-
-  if (rootEventTypesSet !== null) {
-    var rootEventTypes = Array.from(rootEventTypesSet);
-
-    for (var i = 0; i < rootEventTypes.length; i++) {
-      var topLevelEventType = rootEventTypes[i];
-      var rootEventResponderInstances = rootEventTypesToEventResponderInstances.get(
-        topLevelEventType
-      );
-
-      if (rootEventResponderInstances !== undefined) {
-        rootEventResponderInstances.delete(responderInstance);
-      }
-    }
-  }
-}
-
-function validateResponderContext() {
-  if (!(currentInstance !== null)) {
-    {
-      throw Error(
-        "An event responder context was used outside of an event cycle."
-      );
-    }
-  }
-}
-
-function DEPRECATED_dispatchEventForResponderEventSystem(
-  topLevelType,
-  targetFiber,
-  nativeEvent,
-  nativeEventTarget,
-  eventSystemFlags
-) {
-  {
-    var previousInstance = currentInstance;
-    var previousTimeStamp = currentTimeStamp;
-    var previousDocument = currentDocument;
-    var previousPropagationBehavior = currentPropagationBehavior;
-    currentPropagationBehavior = DoNotPropagateToNextResponder; // nodeType 9 is DOCUMENT_NODE
-
-    currentDocument =
-      nativeEventTarget.nodeType === 9
-        ? nativeEventTarget
-        : nativeEventTarget.ownerDocument; // We might want to control timeStamp another way here
-
-    currentTimeStamp = nativeEvent.timeStamp;
-
-    try {
-      batchedEventUpdates(function() {
-        traverseAndHandleEventResponderInstances(
-          topLevelType,
-          targetFiber,
-          nativeEvent,
-          nativeEventTarget,
-          eventSystemFlags
-        );
-      });
-    } finally {
-      currentInstance = previousInstance;
-      currentTimeStamp = previousTimeStamp;
-      currentDocument = previousDocument;
-      currentPropagationBehavior = previousPropagationBehavior;
-    }
-  }
-}
-
-function DEPRECATED_registerRootEventType(
-  rootEventType,
-  eventResponderInstance
-) {
-  var rootEventResponderInstances = rootEventTypesToEventResponderInstances.get(
-    rootEventType
-  );
-
-  if (rootEventResponderInstances === undefined) {
-    rootEventResponderInstances = new Set();
-    rootEventTypesToEventResponderInstances.set(
-      rootEventType,
-      rootEventResponderInstances
-    );
-  }
-
-  var rootEventTypesSet = eventResponderInstance.rootEventTypes;
-
-  if (rootEventTypesSet === null) {
-    rootEventTypesSet = eventResponderInstance.rootEventTypes = new Set();
-  }
-
-  if (!!rootEventTypesSet.has(rootEventType)) {
-    {
-      throw Error(
-        'addRootEventTypes() found a duplicate root event type of "' +
-          rootEventType +
-          '". This might be because the event type exists in the event responder "rootEventTypes" array or because of a previous addRootEventTypes() using this root event type.'
-      );
-    }
-  }
-
-  rootEventTypesSet.add(rootEventType);
-  rootEventResponderInstances.add(eventResponderInstance);
 }
 
 // A reserved attribute.
@@ -3713,1990 +3167,6 @@ function getListenerMapForElement(element) {
   return listenerMap;
 }
 
-/**
- * `ReactInstanceMap` maintains a mapping from a public facing stateful
- * instance (key) and the internal representation (value). This allows public
- * methods to accept the user facing instance as an argument and map them back
- * to internal methods.
- *
- * Note that this module is currently shared and assumed to be stateless.
- * If this becomes an actual Map, that will break.
- */
-function get(key) {
-  return key._reactInternalFiber;
-}
-function has(key) {
-  return key._reactInternalFiber !== undefined;
-}
-function set(key, value) {
-  key._reactInternalFiber = value;
-}
-
-// Don't change these two values. They're used by React Dev Tools.
-var NoEffect =
-  /*              */
-  0;
-var PerformedWork =
-  /*         */
-  1; // You can change the rest (and add more).
-
-var Placement =
-  /*             */
-  2;
-var Update =
-  /*                */
-  4;
-var PlacementAndUpdate =
-  /*    */
-  6;
-var Deletion =
-  /*              */
-  8;
-var ContentReset =
-  /*          */
-  16;
-var Callback =
-  /*              */
-  32;
-var DidCapture =
-  /*            */
-  64;
-var Ref =
-  /*                   */
-  128;
-var Snapshot =
-  /*              */
-  256;
-var Passive =
-  /*               */
-  512;
-var Hydrating =
-  /*             */
-  1024;
-var HydratingAndUpdate =
-  /*    */
-  1028; // Passive & Update & Callback & Ref & Snapshot
-
-var LifecycleEffectMask =
-  /*   */
-  932; // Union of all host effects
-
-var HostEffectMask =
-  /*        */
-  2047;
-var Incomplete =
-  /*            */
-  2048;
-var ShouldCapture =
-  /*         */
-  4096;
-
-var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
-function getNearestMountedFiber(fiber) {
-  var node = fiber;
-  var nearestMounted = fiber;
-
-  if (!fiber.alternate) {
-    // If there is no alternate, this might be a new tree that isn't inserted
-    // yet. If it is, then it will have a pending insertion effect on it.
-    var nextNode = node;
-
-    do {
-      node = nextNode;
-
-      if ((node.effectTag & (Placement | Hydrating)) !== NoEffect) {
-        // This is an insertion or in-progress hydration. The nearest possible
-        // mounted fiber is the parent but we need to continue to figure out
-        // if that one is still mounted.
-        nearestMounted = node.return;
-      }
-
-      nextNode = node.return;
-    } while (nextNode);
-  } else {
-    while (node.return) {
-      node = node.return;
-    }
-  }
-
-  if (node.tag === HostRoot) {
-    // TODO: Check if this was a nested HostRoot when used with
-    // renderContainerIntoSubtree.
-    return nearestMounted;
-  } // If we didn't hit the root, that means that we're in an disconnected tree
-  // that has been unmounted.
-
-  return null;
-}
-function getSuspenseInstanceFromFiber(fiber) {
-  if (fiber.tag === SuspenseComponent) {
-    var suspenseState = fiber.memoizedState;
-
-    if (suspenseState === null) {
-      var current = fiber.alternate;
-
-      if (current !== null) {
-        suspenseState = current.memoizedState;
-      }
-    }
-
-    if (suspenseState !== null) {
-      return suspenseState.dehydrated;
-    }
-  }
-
-  return null;
-}
-function getContainerFromFiber(fiber) {
-  return fiber.tag === HostRoot ? fiber.stateNode.containerInfo : null;
-}
-function isFiberMounted(fiber) {
-  return getNearestMountedFiber(fiber) === fiber;
-}
-function isMounted(component) {
-  {
-    var owner = ReactCurrentOwner.current;
-
-    if (owner !== null && owner.tag === ClassComponent) {
-      var ownerFiber = owner;
-      var instance = ownerFiber.stateNode;
-
-      if (!instance._warnedAboutRefsInRender) {
-        error(
-          "%s is accessing isMounted inside its render() function. " +
-            "render() should be a pure function of props and state. It should " +
-            "never access something that requires stale data from the previous " +
-            "render, such as refs. Move this logic to componentDidMount and " +
-            "componentDidUpdate instead.",
-          getComponentName(ownerFiber.type) || "A component"
-        );
-      }
-
-      instance._warnedAboutRefsInRender = true;
-    }
-  }
-
-  var fiber = get(component);
-
-  if (!fiber) {
-    return false;
-  }
-
-  return getNearestMountedFiber(fiber) === fiber;
-}
-
-function assertIsMounted(fiber) {
-  if (!(getNearestMountedFiber(fiber) === fiber)) {
-    {
-      throw Error("Unable to find node on an unmounted component.");
-    }
-  }
-}
-
-function findCurrentFiberUsingSlowPath(fiber) {
-  var alternate = fiber.alternate;
-
-  if (!alternate) {
-    // If there is no alternate, then we only need to check if it is mounted.
-    var nearestMounted = getNearestMountedFiber(fiber);
-
-    if (!(nearestMounted !== null)) {
-      {
-        throw Error("Unable to find node on an unmounted component.");
-      }
-    }
-
-    if (nearestMounted !== fiber) {
-      return null;
-    }
-
-    return fiber;
-  } // If we have two possible branches, we'll walk backwards up to the root
-  // to see what path the root points to. On the way we may hit one of the
-  // special cases and we'll deal with them.
-
-  var a = fiber;
-  var b = alternate;
-
-  while (true) {
-    var parentA = a.return;
-
-    if (parentA === null) {
-      // We're at the root.
-      break;
-    }
-
-    var parentB = parentA.alternate;
-
-    if (parentB === null) {
-      // There is no alternate. This is an unusual case. Currently, it only
-      // happens when a Suspense component is hidden. An extra fragment fiber
-      // is inserted in between the Suspense fiber and its children. Skip
-      // over this extra fragment fiber and proceed to the next parent.
-      var nextParent = parentA.return;
-
-      if (nextParent !== null) {
-        a = b = nextParent;
-        continue;
-      } // If there's no parent, we're at the root.
-
-      break;
-    } // If both copies of the parent fiber point to the same child, we can
-    // assume that the child is current. This happens when we bailout on low
-    // priority: the bailed out fiber's child reuses the current child.
-
-    if (parentA.child === parentB.child) {
-      var child = parentA.child;
-
-      while (child) {
-        if (child === a) {
-          // We've determined that A is the current branch.
-          assertIsMounted(parentA);
-          return fiber;
-        }
-
-        if (child === b) {
-          // We've determined that B is the current branch.
-          assertIsMounted(parentA);
-          return alternate;
-        }
-
-        child = child.sibling;
-      } // We should never have an alternate for any mounting node. So the only
-      // way this could possibly happen is if this was unmounted, if at all.
-
-      {
-        {
-          throw Error("Unable to find node on an unmounted component.");
-        }
-      }
-    }
-
-    if (a.return !== b.return) {
-      // The return pointer of A and the return pointer of B point to different
-      // fibers. We assume that return pointers never criss-cross, so A must
-      // belong to the child set of A.return, and B must belong to the child
-      // set of B.return.
-      a = parentA;
-      b = parentB;
-    } else {
-      // The return pointers point to the same fiber. We'll have to use the
-      // default, slow path: scan the child sets of each parent alternate to see
-      // which child belongs to which set.
-      //
-      // Search parent A's child set
-      var didFindChild = false;
-      var _child = parentA.child;
-
-      while (_child) {
-        if (_child === a) {
-          didFindChild = true;
-          a = parentA;
-          b = parentB;
-          break;
-        }
-
-        if (_child === b) {
-          didFindChild = true;
-          b = parentA;
-          a = parentB;
-          break;
-        }
-
-        _child = _child.sibling;
-      }
-
-      if (!didFindChild) {
-        // Search parent B's child set
-        _child = parentB.child;
-
-        while (_child) {
-          if (_child === a) {
-            didFindChild = true;
-            a = parentB;
-            b = parentA;
-            break;
-          }
-
-          if (_child === b) {
-            didFindChild = true;
-            b = parentB;
-            a = parentA;
-            break;
-          }
-
-          _child = _child.sibling;
-        }
-
-        if (!didFindChild) {
-          {
-            throw Error(
-              "Child was not found in either parent set. This indicates a bug in React related to the return pointer. Please file an issue."
-            );
-          }
-        }
-      }
-    }
-
-    if (!(a.alternate === b)) {
-      {
-        throw Error(
-          "Return fibers should always be each others' alternates. This error is likely caused by a bug in React. Please file an issue."
-        );
-      }
-    }
-  } // If the root is not a host container, we're in a disconnected tree. I.e.
-  // unmounted.
-
-  if (!(a.tag === HostRoot)) {
-    {
-      throw Error("Unable to find node on an unmounted component.");
-    }
-  }
-
-  if (a.stateNode.current === a) {
-    // We've determined that A is the current branch.
-    return fiber;
-  } // Otherwise B has to be current branch.
-
-  return alternate;
-}
-function findCurrentHostFiber(parent) {
-  var currentParent = findCurrentFiberUsingSlowPath(parent);
-
-  if (!currentParent) {
-    return null;
-  } // Next we'll drill down this component to find the first HostComponent/Text.
-
-  var node = currentParent;
-
-  while (true) {
-    if (node.tag === HostComponent || node.tag === HostText) {
-      return node;
-    } else if (node.child) {
-      node.child.return = node;
-      node = node.child;
-      continue;
-    }
-
-    if (node === currentParent) {
-      return null;
-    }
-
-    while (!node.sibling) {
-      if (!node.return || node.return === currentParent) {
-        return null;
-      }
-
-      node = node.return;
-    }
-
-    node.sibling.return = node.return;
-    node = node.sibling;
-  } // Flow needs the return null here, but ESLint complains about it.
-  // eslint-disable-next-line no-unreachable
-
-  return null;
-}
-function findCurrentHostFiberWithNoPortals(parent) {
-  var currentParent = findCurrentFiberUsingSlowPath(parent);
-
-  if (!currentParent) {
-    return null;
-  } // Next we'll drill down this component to find the first HostComponent/Text.
-
-  var node = currentParent;
-
-  while (true) {
-    if (
-      node.tag === HostComponent ||
-      node.tag === HostText ||
-      enableFundamentalAPI
-    ) {
-      return node;
-    } else if (node.child && node.tag !== HostPortal) {
-      node.child.return = node;
-      node = node.child;
-      continue;
-    }
-
-    if (node === currentParent) {
-      return null;
-    }
-
-    while (!node.sibling) {
-      if (!node.return || node.return === currentParent) {
-        return null;
-      }
-
-      node = node.return;
-    }
-
-    node.sibling.return = node.return;
-    node = node.sibling;
-  } // Flow needs the return null here, but ESLint complains about it.
-  // eslint-disable-next-line no-unreachable
-
-  return null;
-}
-
-/**
- * Accumulates items that must not be null or undefined into the first one. This
- * is used to conserve memory by avoiding array allocations, and thus sacrifices
- * API cleanness. Since `current` can be null before being passed in and not
- * null after this function, make sure to assign it back to `current`:
- *
- * `a = accumulateInto(a, b);`
- *
- * This API should be sparingly used. Try `accumulate` for something cleaner.
- *
- * @return {*|array<*>} An accumulation of items.
- */
-
-function accumulateInto(current, next) {
-  if (!(next != null)) {
-    {
-      throw Error(
-        "accumulateInto(...): Accumulated items must not be null or undefined."
-      );
-    }
-  }
-
-  if (current == null) {
-    return next;
-  } // Both are not empty. Warning: Never call x.concat(y) when you are not
-  // certain that x is an Array (x could be a string with concat method).
-
-  if (Array.isArray(current)) {
-    if (Array.isArray(next)) {
-      current.push.apply(current, next);
-      return current;
-    }
-
-    current.push(next);
-    return current;
-  }
-
-  if (Array.isArray(next)) {
-    // A bit too dangerous to mutate `next`.
-    return [current].concat(next);
-  }
-
-  return [current, next];
-}
-
-/**
- * @param {array} arr an "accumulation" of items which is either an Array or
- * a single item. Useful when paired with the `accumulate` module. This is a
- * simple utility that allows us to reason about a collection of items, but
- * handling the case when there is exactly one item (and we do not need to
- * allocate an array).
- * @param {function} cb Callback invoked with each element or a collection.
- * @param {?} [scope] Scope used as `this` in a callback.
- */
-function forEachAccumulated(arr, cb, scope) {
-  if (Array.isArray(arr)) {
-    arr.forEach(cb, scope);
-  } else if (arr) {
-    cb.call(scope, arr);
-  }
-}
-
-/**
- * Internal queue of events that have accumulated their dispatches and are
- * waiting to have their dispatches executed.
- */
-
-var eventQueue = null;
-/**
- * Dispatches an event and releases it back into the pool, unless persistent.
- *
- * @param {?object} event Synthetic event to be dispatched.
- * @private
- */
-
-var executeDispatchesAndRelease = function(event) {
-  if (event) {
-    executeDispatchesInOrder(event);
-
-    if (!event.isPersistent()) {
-      event.constructor.release(event);
-    }
-  }
-};
-
-var executeDispatchesAndReleaseTopLevel = function(e) {
-  return executeDispatchesAndRelease(e);
-};
-
-function runEventsInBatch(events) {
-  if (events !== null) {
-    eventQueue = accumulateInto(eventQueue, events);
-  } // Set `eventQueue` to null before processing it so that we can tell if more
-  // events get enqueued while processing.
-
-  var processingEventQueue = eventQueue;
-  eventQueue = null;
-
-  if (!processingEventQueue) {
-    return;
-  }
-
-  forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
-
-  if (!!eventQueue) {
-    {
-      throw Error(
-        "processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented."
-      );
-    }
-  } // This would be a good time to rethrow if any of the event handlers threw.
-
-  rethrowCaughtError();
-}
-
-/**
- * Gets the target node from a native browser event by accounting for
- * inconsistencies in browser DOM APIs.
- *
- * @param {object} nativeEvent Native browser event.
- * @return {DOMEventTarget} Target node.
- */
-
-function getEventTarget(nativeEvent) {
-  // Fallback to nativeEvent.srcElement for IE9
-  // https://github.com/facebook/react/issues/12506
-  var target = nativeEvent.target || nativeEvent.srcElement || window; // Normalize SVG <use> element events #4963
-
-  if (target.correspondingUseElement) {
-    target = target.correspondingUseElement;
-  } // Safari may fire events on text nodes (Node.TEXT_NODE is 3).
-  // @see http://www.quirksmode.org/js/events_properties.html
-
-  return target.nodeType === TEXT_NODE ? target.parentNode : target;
-}
-
-/**
- * Checks if an event is supported in the current execution environment.
- *
- * NOTE: This will not work correctly for non-generic events such as `change`,
- * `reset`, `load`, `error`, and `select`.
- *
- * Borrows from Modernizr.
- *
- * @param {string} eventNameSuffix Event name, e.g. "click".
- * @return {boolean} True if the event is supported.
- * @internal
- * @license Modernizr 3.0.0pre (Custom Build) | MIT
- */
-
-function isEventSupported(eventNameSuffix) {
-  if (!canUseDOM) {
-    return false;
-  }
-
-  var eventName = "on" + eventNameSuffix;
-  var isSupported = eventName in document;
-
-  if (!isSupported) {
-    var element = document.createElement("div");
-    element.setAttribute(eventName, "return;");
-    isSupported = typeof element[eventName] === "function";
-  }
-
-  return isSupported;
-}
-
-/**
- * Summary of `DOMEventPluginSystem` event handling:
- *
- *  - Top-level delegation is used to trap most native browser events. This
- *    may only occur in the main thread and is the responsibility of
- *    ReactDOMEventListener, which is injected and can therefore support
- *    pluggable event sources. This is the only work that occurs in the main
- *    thread.
- *
- *  - We normalize and de-duplicate events to account for browser quirks. This
- *    may be done in the worker thread.
- *
- *  - Forward these native events (with the associated top-level type used to
- *    trap it) to `EventPluginRegistry`, which in turn will ask plugins if they want
- *    to extract any synthetic events.
- *
- *  - The `EventPluginRegistry` will then process each event by annotating them with
- *    "dispatches", a sequence of listeners and IDs that care about that event.
- *
- *  - The `EventPluginRegistry` then dispatches the events.
- *
- * Overview of React and the event system:
- *
- * +------------+    .
- * |    DOM     |    .
- * +------------+    .
- *       |           .
- *       v           .
- * +------------+    .
- * | ReactEvent |    .
- * |  Listener  |    .
- * +------------+    .                         +-----------+
- *       |           .               +--------+|SimpleEvent|
- *       |           .               |         |Plugin     |
- * +-----|------+    .               v         +-----------+
- * |     |      |    .    +--------------+                    +------------+
- * |     +-----------.--->|PluginRegistry|                    |    Event   |
- * |            |    .    |              |     +-----------+  | Propagators|
- * | ReactEvent |    .    |              |     |TapEvent   |  |------------|
- * |  Emitter   |    .    |              |<---+|Plugin     |  |other plugin|
- * |            |    .    |              |     +-----------+  |  utilities |
- * |     +-----------.--->|              |                    +------------+
- * |     |      |    .    +--------------+
- * +-----|------+    .                ^        +-----------+
- *       |           .                |        |Enter/Leave|
- *       +           .                +-------+|Plugin     |
- * +-------------+   .                         +-----------+
- * | application |   .
- * |-------------|   .
- * |             |   .
- * |             |   .
- * +-------------+   .
- *                   .
- *    React Core     .  General Purpose Event Plugin System
- */
-
-var CALLBACK_BOOKKEEPING_POOL_SIZE = 10;
-var callbackBookkeepingPool = [];
-
-function releaseTopLevelCallbackBookKeeping(instance) {
-  instance.topLevelType = null;
-  instance.nativeEvent = null;
-  instance.targetInst = null;
-  instance.ancestors.length = 0;
-
-  if (callbackBookkeepingPool.length < CALLBACK_BOOKKEEPING_POOL_SIZE) {
-    callbackBookkeepingPool.push(instance);
-  }
-} // Used to store ancestor hierarchy in top level callback
-
-function getTopLevelCallbackBookKeeping(
-  topLevelType,
-  nativeEvent,
-  targetInst,
-  eventSystemFlags
-) {
-  if (callbackBookkeepingPool.length) {
-    var instance = callbackBookkeepingPool.pop();
-    instance.topLevelType = topLevelType;
-    instance.eventSystemFlags = eventSystemFlags;
-    instance.nativeEvent = nativeEvent;
-    instance.targetInst = targetInst;
-    return instance;
-  }
-
-  return {
-    topLevelType: topLevelType,
-    eventSystemFlags: eventSystemFlags,
-    nativeEvent: nativeEvent,
-    targetInst: targetInst,
-    ancestors: []
-  };
-}
-/**
- * Find the deepest React component completely containing the root of the
- * passed-in instance (for use when entire React trees are nested within each
- * other). If React trees are not nested, returns null.
- */
-
-function findRootContainerNode(inst) {
-  if (inst.tag === HostRoot) {
-    return inst.stateNode.containerInfo;
-  } // TODO: It may be a good idea to cache this to prevent unnecessary DOM
-  // traversal, but caching is difficult to do correctly without using a
-  // mutation observer to listen for all DOM changes.
-
-  while (inst.return) {
-    inst = inst.return;
-  }
-
-  if (inst.tag !== HostRoot) {
-    // This can happen if we're in a detached tree.
-    return null;
-  }
-
-  return inst.stateNode.containerInfo;
-}
-/**
- * Allows registered plugins an opportunity to extract events from top-level
- * native browser events.
- *
- * @return {*} An accumulation of synthetic events.
- * @internal
- */
-
-function extractPluginEvents(
-  topLevelType,
-  targetInst,
-  nativeEvent,
-  nativeEventTarget,
-  eventSystemFlags
-) {
-  var events = null;
-
-  for (var i = 0; i < plugins.length; i++) {
-    // Not every plugin in the ordering may be loaded at runtime.
-    var possiblePlugin = plugins[i];
-
-    if (possiblePlugin) {
-      var extractedEvents = possiblePlugin.extractEvents(
-        topLevelType,
-        targetInst,
-        nativeEvent,
-        nativeEventTarget,
-        eventSystemFlags
-      );
-
-      if (extractedEvents) {
-        events = accumulateInto(events, extractedEvents);
-      }
-    }
-  }
-
-  return events;
-}
-
-function runExtractedPluginEventsInBatch(
-  topLevelType,
-  targetInst,
-  nativeEvent,
-  nativeEventTarget,
-  eventSystemFlags
-) {
-  var events = extractPluginEvents(
-    topLevelType,
-    targetInst,
-    nativeEvent,
-    nativeEventTarget,
-    eventSystemFlags
-  );
-  runEventsInBatch(events);
-}
-
-function handleTopLevel(bookKeeping) {
-  var targetInst = bookKeeping.targetInst; // Loop through the hierarchy, in case there's any nested components.
-  // It's important that we build the array of ancestors before calling any
-  // event handlers, because event handlers can modify the DOM, leading to
-  // inconsistencies with ReactMount's node cache. See #1105.
-
-  var ancestor = targetInst;
-
-  do {
-    if (!ancestor) {
-      var ancestors = bookKeeping.ancestors;
-      ancestors.push(ancestor);
-      break;
-    }
-
-    var root = findRootContainerNode(ancestor);
-
-    if (!root) {
-      break;
-    }
-
-    var tag = ancestor.tag;
-
-    if (tag === HostComponent || tag === HostText) {
-      bookKeeping.ancestors.push(ancestor);
-    }
-
-    ancestor = getClosestInstanceFromNode(root);
-  } while (ancestor);
-
-  for (var i = 0; i < bookKeeping.ancestors.length; i++) {
-    targetInst = bookKeeping.ancestors[i];
-    var eventTarget = getEventTarget(bookKeeping.nativeEvent);
-    var topLevelType = bookKeeping.topLevelType;
-    var nativeEvent = bookKeeping.nativeEvent;
-    var eventSystemFlags = bookKeeping.eventSystemFlags; // If this is the first ancestor, we mark it on the system flags
-
-    if (i === 0) {
-      eventSystemFlags |= IS_FIRST_ANCESTOR;
-    }
-
-    runExtractedPluginEventsInBatch(
-      topLevelType,
-      targetInst,
-      nativeEvent,
-      eventTarget,
-      eventSystemFlags
-    );
-  }
-}
-
-function dispatchEventForLegacyPluginEventSystem(
-  topLevelType,
-  eventSystemFlags,
-  nativeEvent,
-  targetInst
-) {
-  var bookKeeping = getTopLevelCallbackBookKeeping(
-    topLevelType,
-    nativeEvent,
-    targetInst,
-    eventSystemFlags
-  );
-
-  try {
-    // Event queue being processed in the same cycle allows
-    // `preventDefault`.
-    batchedEventUpdates(handleTopLevel, bookKeeping);
-  } finally {
-    releaseTopLevelCallbackBookKeeping(bookKeeping);
-  }
-}
-/**
- * We listen for bubbled touch events on the document object.
- *
- * Firefox v8.01 (and possibly others) exhibited strange behavior when
- * mounting `onmousemove` events at some node that was not the document
- * element. The symptoms were that if your mouse is not moving over something
- * contained within that mount point (for example on the background) the
- * top-level listeners for `onmousemove` won't be called. However, if you
- * register the `mousemove` on the document object, then it will of course
- * catch all `mousemove`s. This along with iOS quirks, justifies restricting
- * top-level listeners to the document object only, at least for these
- * movement types of events and possibly all events.
- *
- * @see http://www.quirksmode.org/blog/archives/2010/09/click_event_del.html
- *
- * Also, `keyup`/`keypress`/`keydown` do not bubble to the window on IE, but
- * they bubble to document.
- *
- * @param {string} registrationName Name of listener (e.g. `onClick`).
- * @param {object} mountAt Container where to mount the listener
- */
-
-function legacyListenToEvent(registrationName, mountAt) {
-  var listenerMap = getListenerMapForElement(mountAt);
-  var dependencies = registrationNameDependencies[registrationName];
-
-  for (var i = 0; i < dependencies.length; i++) {
-    var dependency = dependencies[i];
-    legacyListenToTopLevelEvent(dependency, mountAt, listenerMap);
-  }
-}
-function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
-  if (!listenerMap.has(topLevelType)) {
-    switch (topLevelType) {
-      case TOP_SCROLL:
-        trapCapturedEvent(TOP_SCROLL, mountAt);
-        break;
-
-      case TOP_FOCUS:
-      case TOP_BLUR:
-        trapCapturedEvent(TOP_FOCUS, mountAt);
-        trapCapturedEvent(TOP_BLUR, mountAt); // We set the flag for a single dependency later in this function,
-        // but this ensures we mark both as attached rather than just one.
-
-        listenerMap.set(TOP_BLUR, null);
-        listenerMap.set(TOP_FOCUS, null);
-        break;
-
-      case TOP_CANCEL:
-      case TOP_CLOSE:
-        if (isEventSupported(getRawEventName(topLevelType))) {
-          trapCapturedEvent(topLevelType, mountAt);
-        }
-
-        break;
-
-      case TOP_INVALID:
-      case TOP_SUBMIT:
-      case TOP_RESET:
-        // We listen to them on the target DOM elements.
-        // Some of them bubble so we don't want them to fire twice.
-        break;
-
-      default:
-        // By default, listen on the top level to all non-media events.
-        // Media events don't bubble so adding the listener wouldn't do anything.
-        var isMediaEvent = mediaEventTypes.indexOf(topLevelType) !== -1;
-
-        if (!isMediaEvent) {
-          trapBubbledEvent(topLevelType, mountAt);
-        }
-
-        break;
-    }
-
-    listenerMap.set(topLevelType, null);
-  }
-}
-function isListeningToAllDependencies(registrationName, mountAt) {
-  var listenerMap = getListenerMapForElement(mountAt);
-  var dependencies = registrationNameDependencies[registrationName];
-
-  for (var i = 0; i < dependencies.length; i++) {
-    var dependency = dependencies[i];
-
-    if (!listenerMap.has(dependency)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-var attemptSynchronousHydration;
-function setAttemptSynchronousHydration(fn) {
-  attemptSynchronousHydration = fn;
-}
-var attemptUserBlockingHydration;
-function setAttemptUserBlockingHydration(fn) {
-  attemptUserBlockingHydration = fn;
-}
-var attemptContinuousHydration;
-function setAttemptContinuousHydration(fn) {
-  attemptContinuousHydration = fn;
-}
-var attemptHydrationAtCurrentPriority;
-function setAttemptHydrationAtCurrentPriority(fn) {
-  attemptHydrationAtCurrentPriority = fn;
-} // TODO: Upgrade this definition once we're on a newer version of Flow that
-var hasScheduledReplayAttempt = false; // The queue of discrete events to be replayed.
-
-var queuedDiscreteEvents = []; // Indicates if any continuous event targets are non-null for early bailout.
-// if the last target was dehydrated.
-
-var queuedFocus = null;
-var queuedDrag = null;
-var queuedMouse = null; // For pointer events there can be one latest event per pointerId.
-
-var queuedPointers = new Map();
-var queuedPointerCaptures = new Map(); // We could consider replaying selectionchange and touchmoves too.
-
-var queuedExplicitHydrationTargets = [];
-function hasQueuedDiscreteEvents() {
-  return queuedDiscreteEvents.length > 0;
-}
-var discreteReplayableEvents = [
-  TOP_MOUSE_DOWN,
-  TOP_MOUSE_UP,
-  TOP_TOUCH_CANCEL,
-  TOP_TOUCH_END,
-  TOP_TOUCH_START,
-  TOP_AUX_CLICK,
-  TOP_DOUBLE_CLICK,
-  TOP_POINTER_CANCEL,
-  TOP_POINTER_DOWN,
-  TOP_POINTER_UP,
-  TOP_DRAG_END,
-  TOP_DRAG_START,
-  TOP_DROP,
-  TOP_COMPOSITION_END,
-  TOP_COMPOSITION_START,
-  TOP_KEY_DOWN,
-  TOP_KEY_PRESS,
-  TOP_KEY_UP,
-  TOP_INPUT,
-  TOP_TEXT_INPUT,
-  TOP_CLOSE,
-  TOP_CANCEL,
-  TOP_COPY,
-  TOP_CUT,
-  TOP_PASTE,
-  TOP_CLICK,
-  TOP_CHANGE,
-  TOP_CONTEXT_MENU,
-  TOP_RESET,
-  TOP_SUBMIT
-];
-var continuousReplayableEvents = [
-  TOP_FOCUS,
-  TOP_BLUR,
-  TOP_DRAG_ENTER,
-  TOP_DRAG_LEAVE,
-  TOP_MOUSE_OVER,
-  TOP_MOUSE_OUT,
-  TOP_POINTER_OVER,
-  TOP_POINTER_OUT,
-  TOP_GOT_POINTER_CAPTURE,
-  TOP_LOST_POINTER_CAPTURE
-];
-function isReplayableDiscreteEvent(eventType) {
-  return discreteReplayableEvents.indexOf(eventType) > -1;
-}
-
-function trapReplayableEventForDocument(topLevelType, document, listenerMap) {
-  legacyListenToTopLevelEvent(topLevelType, document, listenerMap);
-
-  {
-    // Trap events for the responder system.
-    var topLevelTypeString = unsafeCastDOMTopLevelTypeToString(topLevelType); // TODO: Ideally we shouldn't need these to be active but
-    // if we only have a passive listener, we at least need it
-    // to still pretend to be active so that Flare gets those
-    // events.
-
-    var activeEventKey = topLevelTypeString + "_active";
-
-    if (!listenerMap.has(activeEventKey)) {
-      var listener = addResponderEventSystemEvent(
-        document,
-        topLevelTypeString,
-        false
-      );
-      listenerMap.set(activeEventKey, listener);
-    }
-  }
-}
-
-function eagerlyTrapReplayableEvents(container, document) {
-  var listenerMapForDoc = getListenerMapForElement(document); // Discrete
-
-  discreteReplayableEvents.forEach(function(topLevelType) {
-    trapReplayableEventForDocument(topLevelType, document, listenerMapForDoc);
-  }); // Continuous
-
-  continuousReplayableEvents.forEach(function(topLevelType) {
-    trapReplayableEventForDocument(topLevelType, document, listenerMapForDoc);
-  });
-}
-
-function createQueuedReplayableEvent(
-  blockedOn,
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  return {
-    blockedOn: blockedOn,
-    topLevelType: topLevelType,
-    eventSystemFlags: eventSystemFlags | IS_REPLAYED,
-    nativeEvent: nativeEvent,
-    container: container
-  };
-}
-
-function queueDiscreteEvent(
-  blockedOn,
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  var queuedEvent = createQueuedReplayableEvent(
-    blockedOn,
-    topLevelType,
-    eventSystemFlags,
-    container,
-    nativeEvent
-  );
-  queuedDiscreteEvents.push(queuedEvent);
-
-  {
-    if (queuedDiscreteEvents.length === 1) {
-      // If this was the first discrete event, we might be able to
-      // synchronously unblock it so that preventDefault still works.
-      while (queuedEvent.blockedOn !== null) {
-        var _fiber = getInstanceFromNode$2(queuedEvent.blockedOn);
-
-        if (_fiber === null) {
-          break;
-        }
-
-        attemptSynchronousHydration(_fiber);
-
-        if (queuedEvent.blockedOn === null) {
-          // We got unblocked by hydration. Let's try again.
-          replayUnblockedEvents(); // If we're reblocked, on an inner boundary, we might need
-          // to attempt hydrating that one.
-
-          continue;
-        } else {
-          // We're still blocked from hydration, we have to give up
-          // and replay later.
-          break;
-        }
-      }
-    }
-  }
-} // Resets the replaying for this type of continuous event to no event.
-
-function clearIfContinuousEvent(topLevelType, nativeEvent) {
-  switch (topLevelType) {
-    case TOP_FOCUS:
-    case TOP_BLUR:
-      queuedFocus = null;
-      break;
-
-    case TOP_DRAG_ENTER:
-    case TOP_DRAG_LEAVE:
-      queuedDrag = null;
-      break;
-
-    case TOP_MOUSE_OVER:
-    case TOP_MOUSE_OUT:
-      queuedMouse = null;
-      break;
-
-    case TOP_POINTER_OVER:
-    case TOP_POINTER_OUT: {
-      var pointerId = nativeEvent.pointerId;
-      queuedPointers.delete(pointerId);
-      break;
-    }
-
-    case TOP_GOT_POINTER_CAPTURE:
-    case TOP_LOST_POINTER_CAPTURE: {
-      var _pointerId = nativeEvent.pointerId;
-      queuedPointerCaptures.delete(_pointerId);
-      break;
-    }
-  }
-}
-
-function accumulateOrCreateContinuousQueuedReplayableEvent(
-  existingQueuedEvent,
-  blockedOn,
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  if (
-    existingQueuedEvent === null ||
-    existingQueuedEvent.nativeEvent !== nativeEvent
-  ) {
-    var queuedEvent = createQueuedReplayableEvent(
-      blockedOn,
-      topLevelType,
-      eventSystemFlags,
-      container,
-      nativeEvent
-    );
-
-    if (blockedOn !== null) {
-      var _fiber2 = getInstanceFromNode$2(blockedOn);
-
-      if (_fiber2 !== null) {
-        // Attempt to increase the priority of this target.
-        attemptContinuousHydration(_fiber2);
-      }
-    }
-
-    return queuedEvent;
-  } // If we have already queued this exact event, then it's because
-  // the different event systems have different DOM event listeners.
-  // We can accumulate the flags and store a single event to be
-  // replayed.
-
-  existingQueuedEvent.eventSystemFlags |= eventSystemFlags;
-  return existingQueuedEvent;
-}
-
-function queueIfContinuousEvent(
-  blockedOn,
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  // These set relatedTarget to null because the replayed event will be treated as if we
-  // moved from outside the window (no target) onto the target once it hydrates.
-  // Instead of mutating we could clone the event.
-  switch (topLevelType) {
-    case TOP_FOCUS: {
-      var focusEvent = nativeEvent;
-      queuedFocus = accumulateOrCreateContinuousQueuedReplayableEvent(
-        queuedFocus,
-        blockedOn,
-        topLevelType,
-        eventSystemFlags,
-        container,
-        focusEvent
-      );
-      return true;
-    }
-
-    case TOP_DRAG_ENTER: {
-      var dragEvent = nativeEvent;
-      queuedDrag = accumulateOrCreateContinuousQueuedReplayableEvent(
-        queuedDrag,
-        blockedOn,
-        topLevelType,
-        eventSystemFlags,
-        container,
-        dragEvent
-      );
-      return true;
-    }
-
-    case TOP_MOUSE_OVER: {
-      var mouseEvent = nativeEvent;
-      queuedMouse = accumulateOrCreateContinuousQueuedReplayableEvent(
-        queuedMouse,
-        blockedOn,
-        topLevelType,
-        eventSystemFlags,
-        container,
-        mouseEvent
-      );
-      return true;
-    }
-
-    case TOP_POINTER_OVER: {
-      var pointerEvent = nativeEvent;
-      var pointerId = pointerEvent.pointerId;
-      queuedPointers.set(
-        pointerId,
-        accumulateOrCreateContinuousQueuedReplayableEvent(
-          queuedPointers.get(pointerId) || null,
-          blockedOn,
-          topLevelType,
-          eventSystemFlags,
-          container,
-          pointerEvent
-        )
-      );
-      return true;
-    }
-
-    case TOP_GOT_POINTER_CAPTURE: {
-      var _pointerEvent = nativeEvent;
-      var _pointerId2 = _pointerEvent.pointerId;
-      queuedPointerCaptures.set(
-        _pointerId2,
-        accumulateOrCreateContinuousQueuedReplayableEvent(
-          queuedPointerCaptures.get(_pointerId2) || null,
-          blockedOn,
-          topLevelType,
-          eventSystemFlags,
-          container,
-          _pointerEvent
-        )
-      );
-      return true;
-    }
-  }
-
-  return false;
-} // Check if this target is unblocked. Returns true if it's unblocked.
-
-function attemptExplicitHydrationTarget(queuedTarget) {
-  // TODO: This function shares a lot of logic with attemptToDispatchEvent.
-  // Try to unify them. It's a bit tricky since it would require two return
-  // values.
-  var targetInst = getClosestInstanceFromNode(queuedTarget.target);
-
-  if (targetInst !== null) {
-    var nearestMounted = getNearestMountedFiber(targetInst);
-
-    if (nearestMounted !== null) {
-      var tag = nearestMounted.tag;
-
-      if (tag === SuspenseComponent) {
-        var instance = getSuspenseInstanceFromFiber(nearestMounted);
-
-        if (instance !== null) {
-          // We're blocked on hydrating this boundary.
-          // Increase its priority.
-          queuedTarget.blockedOn = instance;
-          Scheduler.unstable_runWithPriority(queuedTarget.priority, function() {
-            attemptHydrationAtCurrentPriority(nearestMounted);
-          });
-          return;
-        }
-      } else if (tag === HostRoot) {
-        var root = nearestMounted.stateNode;
-
-        if (root.hydrate) {
-          queuedTarget.blockedOn = getContainerFromFiber(nearestMounted); // We don't currently have a way to increase the priority of
-          // a root other than sync.
-
-          return;
-        }
-      }
-    }
-  }
-
-  queuedTarget.blockedOn = null;
-}
-
-function queueExplicitHydrationTarget(target) {
-  {
-    var priority = Scheduler.unstable_getCurrentPriorityLevel();
-    var queuedTarget = {
-      blockedOn: null,
-      target: target,
-      priority: priority
-    };
-    var i = 0;
-
-    for (; i < queuedExplicitHydrationTargets.length; i++) {
-      if (priority <= queuedExplicitHydrationTargets[i].priority) {
-        break;
-      }
-    }
-
-    queuedExplicitHydrationTargets.splice(i, 0, queuedTarget);
-
-    if (i === 0) {
-      attemptExplicitHydrationTarget(queuedTarget);
-    }
-  }
-}
-
-function attemptReplayContinuousQueuedEvent(queuedEvent) {
-  if (queuedEvent.blockedOn !== null) {
-    return false;
-  }
-
-  var nextBlockedOn = attemptToDispatchEvent(
-    queuedEvent.topLevelType,
-    queuedEvent.eventSystemFlags,
-    queuedEvent.container,
-    queuedEvent.nativeEvent
-  );
-
-  if (nextBlockedOn !== null) {
-    // We're still blocked. Try again later.
-    var _fiber3 = getInstanceFromNode$2(nextBlockedOn);
-
-    if (_fiber3 !== null) {
-      attemptContinuousHydration(_fiber3);
-    }
-
-    queuedEvent.blockedOn = nextBlockedOn;
-    return false;
-  }
-
-  return true;
-}
-
-function attemptReplayContinuousQueuedEventInMap(queuedEvent, key, map) {
-  if (attemptReplayContinuousQueuedEvent(queuedEvent)) {
-    map.delete(key);
-  }
-}
-
-function replayUnblockedEvents() {
-  hasScheduledReplayAttempt = false; // First replay discrete events.
-
-  while (queuedDiscreteEvents.length > 0) {
-    var nextDiscreteEvent = queuedDiscreteEvents[0];
-
-    if (nextDiscreteEvent.blockedOn !== null) {
-      // We're still blocked.
-      // Increase the priority of this boundary to unblock
-      // the next discrete event.
-      var _fiber4 = getInstanceFromNode$2(nextDiscreteEvent.blockedOn);
-
-      if (_fiber4 !== null) {
-        attemptUserBlockingHydration(_fiber4);
-      }
-
-      break;
-    }
-
-    var nextBlockedOn = attemptToDispatchEvent(
-      nextDiscreteEvent.topLevelType,
-      nextDiscreteEvent.eventSystemFlags,
-      nextDiscreteEvent.container,
-      nextDiscreteEvent.nativeEvent
-    );
-
-    if (nextBlockedOn !== null) {
-      // We're still blocked. Try again later.
-      nextDiscreteEvent.blockedOn = nextBlockedOn;
-    } else {
-      // We've successfully replayed the first event. Let's try the next one.
-      queuedDiscreteEvents.shift();
-    }
-  } // Next replay any continuous events.
-
-  if (queuedFocus !== null && attemptReplayContinuousQueuedEvent(queuedFocus)) {
-    queuedFocus = null;
-  }
-
-  if (queuedDrag !== null && attemptReplayContinuousQueuedEvent(queuedDrag)) {
-    queuedDrag = null;
-  }
-
-  if (queuedMouse !== null && attemptReplayContinuousQueuedEvent(queuedMouse)) {
-    queuedMouse = null;
-  }
-
-  queuedPointers.forEach(attemptReplayContinuousQueuedEventInMap);
-  queuedPointerCaptures.forEach(attemptReplayContinuousQueuedEventInMap);
-}
-
-function scheduleCallbackIfUnblocked(queuedEvent, unblocked) {
-  if (queuedEvent.blockedOn === unblocked) {
-    queuedEvent.blockedOn = null;
-
-    if (!hasScheduledReplayAttempt) {
-      hasScheduledReplayAttempt = true; // Schedule a callback to attempt replaying as many events as are
-      // now unblocked. This first might not actually be unblocked yet.
-      // We could check it early to avoid scheduling an unnecessary callback.
-
-      Scheduler.unstable_scheduleCallback(
-        Scheduler.unstable_NormalPriority,
-        replayUnblockedEvents
-      );
-    }
-  }
-}
-
-function retryIfBlockedOn(unblocked) {
-  // Mark anything that was blocked on this as no longer blocked
-  // and eligible for a replay.
-  if (queuedDiscreteEvents.length > 0) {
-    scheduleCallbackIfUnblocked(queuedDiscreteEvents[0], unblocked); // This is a exponential search for each boundary that commits. I think it's
-    // worth it because we expect very few discrete events to queue up and once
-    // we are actually fully unblocked it will be fast to replay them.
-
-    for (var i = 1; i < queuedDiscreteEvents.length; i++) {
-      var queuedEvent = queuedDiscreteEvents[i];
-
-      if (queuedEvent.blockedOn === unblocked) {
-        queuedEvent.blockedOn = null;
-      }
-    }
-  }
-
-  if (queuedFocus !== null) {
-    scheduleCallbackIfUnblocked(queuedFocus, unblocked);
-  }
-
-  if (queuedDrag !== null) {
-    scheduleCallbackIfUnblocked(queuedDrag, unblocked);
-  }
-
-  if (queuedMouse !== null) {
-    scheduleCallbackIfUnblocked(queuedMouse, unblocked);
-  }
-
-  var unblock = function(queuedEvent) {
-    return scheduleCallbackIfUnblocked(queuedEvent, unblocked);
-  };
-
-  queuedPointers.forEach(unblock);
-  queuedPointerCaptures.forEach(unblock);
-
-  for (var _i = 0; _i < queuedExplicitHydrationTargets.length; _i++) {
-    var queuedTarget = queuedExplicitHydrationTargets[_i];
-
-    if (queuedTarget.blockedOn === unblocked) {
-      queuedTarget.blockedOn = null;
-    }
-  }
-
-  while (queuedExplicitHydrationTargets.length > 0) {
-    var nextExplicitTarget = queuedExplicitHydrationTargets[0];
-
-    if (nextExplicitTarget.blockedOn !== null) {
-      // We're still blocked.
-      break;
-    } else {
-      attemptExplicitHydrationTarget(nextExplicitTarget);
-
-      if (nextExplicitTarget.blockedOn === null) {
-        // We're unblocked.
-        queuedExplicitHydrationTargets.shift();
-      }
-    }
-  }
-}
-
-var EventListenerWWW = require("EventListener");
-
-function addEventBubbleListener(element, eventType, listener) {
-  EventListenerWWW.listen(element, eventType, listener);
-}
-function addEventCaptureListener(element, eventType, listener) {
-  EventListenerWWW.capture(element, eventType, listener);
-}
-function addEventCaptureListenerWithPassiveFlag(
-  element,
-  eventType,
-  listener,
-  passive
-) {
-  EventListenerWWW.captureWithPassiveFlag(
-    element,
-    eventType,
-    listener,
-    passive
-  );
-} // Flow magic to verify the exports of this file match the original version.
-
-var passiveBrowserEventsSupported = false; // Check if browser support events with passive listeners
-// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#Safely_detecting_option_support
-
-if (canUseDOM) {
-  try {
-    var options = {}; // $FlowFixMe: Ignore Flow complaining about needing a value
-
-    Object.defineProperty(options, "passive", {
-      get: function() {
-        passiveBrowserEventsSupported = true;
-      }
-    });
-    window.addEventListener("test", options, options);
-    window.removeEventListener("test", options, options);
-  } catch (e) {
-    passiveBrowserEventsSupported = false;
-  }
-}
-
-// do it in two places, which duplicates logic
-// and increases the bundle size, we do it all
-// here once. If we remove or refactor the
-// SimpleEventPlugin, we should also remove or
-// update the below line.
-
-var simpleEventPluginEventTypes = {};
-var topLevelEventsToDispatchConfig = new Map();
-var eventPriorities = new Map(); // We store most of the events in this module in pairs of two strings so we can re-use
-// the code required to apply the same logic for event prioritization and that of the
-// SimpleEventPlugin. This complicates things slightly, but the aim is to reduce code
-// duplication (for which there would be quite a bit). For the events that are not needed
-// for the SimpleEventPlugin (otherDiscreteEvents) we process them separately as an
-// array of top level events.
-// Lastly, we ignore prettier so we can keep the formatting sane.
-// prettier-ignore
-
-var discreteEventPairsForSimpleEventPlugin = [TOP_BLUR, 'blur', TOP_CANCEL, 'cancel', TOP_CLICK, 'click', TOP_CLOSE, 'close', TOP_CONTEXT_MENU, 'contextMenu', TOP_COPY, 'copy', TOP_CUT, 'cut', TOP_AUX_CLICK, 'auxClick', TOP_DOUBLE_CLICK, 'doubleClick', TOP_DRAG_END, 'dragEnd', TOP_DRAG_START, 'dragStart', TOP_DROP, 'drop', TOP_FOCUS, 'focus', TOP_INPUT, 'input', TOP_INVALID, 'invalid', TOP_KEY_DOWN, 'keyDown', TOP_KEY_PRESS, 'keyPress', TOP_KEY_UP, 'keyUp', TOP_MOUSE_DOWN, 'mouseDown', TOP_MOUSE_UP, 'mouseUp', TOP_PASTE, 'paste', TOP_PAUSE, 'pause', TOP_PLAY, 'play', TOP_POINTER_CANCEL, 'pointerCancel', TOP_POINTER_DOWN, 'pointerDown', TOP_POINTER_UP, 'pointerUp', TOP_RATE_CHANGE, 'rateChange', TOP_RESET, 'reset', TOP_SEEKED, 'seeked', TOP_SUBMIT, 'submit', TOP_TOUCH_CANCEL, 'touchCancel', TOP_TOUCH_END, 'touchEnd', TOP_TOUCH_START, 'touchStart', TOP_VOLUME_CHANGE, 'volumeChange'];
-var otherDiscreteEvents = [TOP_CHANGE, TOP_SELECTION_CHANGE, TOP_TEXT_INPUT, TOP_COMPOSITION_START, TOP_COMPOSITION_END, TOP_COMPOSITION_UPDATE]; // prettier-ignore
-
-var userBlockingPairsForSimpleEventPlugin = [TOP_DRAG, 'drag', TOP_DRAG_ENTER, 'dragEnter', TOP_DRAG_EXIT, 'dragExit', TOP_DRAG_LEAVE, 'dragLeave', TOP_DRAG_OVER, 'dragOver', TOP_MOUSE_MOVE, 'mouseMove', TOP_MOUSE_OUT, 'mouseOut', TOP_MOUSE_OVER, 'mouseOver', TOP_POINTER_MOVE, 'pointerMove', TOP_POINTER_OUT, 'pointerOut', TOP_POINTER_OVER, 'pointerOver', TOP_SCROLL, 'scroll', TOP_TOGGLE, 'toggle', TOP_TOUCH_MOVE, 'touchMove', TOP_WHEEL, 'wheel']; // prettier-ignore
-
-var continuousPairsForSimpleEventPlugin = [
-  TOP_ABORT,
-  "abort",
-  TOP_ANIMATION_END,
-  "animationEnd",
-  TOP_ANIMATION_ITERATION,
-  "animationIteration",
-  TOP_ANIMATION_START,
-  "animationStart",
-  TOP_CAN_PLAY,
-  "canPlay",
-  TOP_CAN_PLAY_THROUGH,
-  "canPlayThrough",
-  TOP_DURATION_CHANGE,
-  "durationChange",
-  TOP_EMPTIED,
-  "emptied",
-  TOP_ENCRYPTED,
-  "encrypted",
-  TOP_ENDED,
-  "ended",
-  TOP_ERROR,
-  "error",
-  TOP_GOT_POINTER_CAPTURE,
-  "gotPointerCapture",
-  TOP_LOAD,
-  "load",
-  TOP_LOADED_DATA,
-  "loadedData",
-  TOP_LOADED_METADATA,
-  "loadedMetadata",
-  TOP_LOAD_START,
-  "loadStart",
-  TOP_LOST_POINTER_CAPTURE,
-  "lostPointerCapture",
-  TOP_PLAYING,
-  "playing",
-  TOP_PROGRESS,
-  "progress",
-  TOP_SEEKING,
-  "seeking",
-  TOP_STALLED,
-  "stalled",
-  TOP_SUSPEND,
-  "suspend",
-  TOP_TIME_UPDATE,
-  "timeUpdate",
-  TOP_TRANSITION_END,
-  "transitionEnd",
-  TOP_WAITING,
-  "waiting"
-];
-/**
- * Turns
- * ['abort', ...]
- * into
- * eventTypes = {
- *   'abort': {
- *     phasedRegistrationNames: {
- *       bubbled: 'onAbort',
- *       captured: 'onAbortCapture',
- *     },
- *     dependencies: [TOP_ABORT],
- *   },
- *   ...
- * };
- * topLevelEventsToDispatchConfig = new Map([
- *   [TOP_ABORT, { sameConfig }],
- * ]);
- */
-
-function processSimpleEventPluginPairsByPriority(eventTypes, priority) {
-  // As the event types are in pairs of two, we need to iterate
-  // through in twos. The events are in pairs of two to save code
-  // and improve init perf of processing this array, as it will
-  // result in far fewer object allocations and property accesses
-  // if we only use three arrays to process all the categories of
-  // instead of tuples.
-  for (var i = 0; i < eventTypes.length; i += 2) {
-    var topEvent = eventTypes[i];
-    var event = eventTypes[i + 1];
-    var capitalizedEvent = event[0].toUpperCase() + event.slice(1);
-    var onEvent = "on" + capitalizedEvent;
-    var config = {
-      phasedRegistrationNames: {
-        bubbled: onEvent,
-        captured: onEvent + "Capture"
-      },
-      dependencies: [topEvent],
-      eventPriority: priority
-    };
-    eventPriorities.set(topEvent, priority);
-    topLevelEventsToDispatchConfig.set(topEvent, config);
-    simpleEventPluginEventTypes[event] = config;
-  }
-}
-
-function processTopEventPairsByPriority(eventTypes, priority) {
-  for (var i = 0; i < eventTypes.length; i++) {
-    eventPriorities.set(eventTypes[i], priority);
-  }
-} // SimpleEventPlugin
-
-processSimpleEventPluginPairsByPriority(
-  discreteEventPairsForSimpleEventPlugin,
-  DiscreteEvent
-);
-processSimpleEventPluginPairsByPriority(
-  userBlockingPairsForSimpleEventPlugin,
-  UserBlockingEvent
-);
-processSimpleEventPluginPairsByPriority(
-  continuousPairsForSimpleEventPlugin,
-  ContinuousEvent
-); // Not used by SimpleEventPlugin
-
-processTopEventPairsByPriority(otherDiscreteEvents, DiscreteEvent);
-function getEventPriorityForPluginSystem(topLevelType) {
-  var priority = eventPriorities.get(topLevelType); // Default to a ContinuousEvent. Note: we might
-  // want to warn if we can't detect the priority
-  // for the event.
-
-  return priority === undefined ? ContinuousEvent : priority;
-}
-
-// Intentionally not named imports because Rollup would use dynamic dispatch for
-var UserBlockingPriority$1 = Scheduler.unstable_UserBlockingPriority,
-  runWithPriority$1 = Scheduler.unstable_runWithPriority; // TODO: can we stop exporting these?
-
-var _enabled = true;
-function setEnabled(enabled) {
-  _enabled = !!enabled;
-}
-function isEnabled() {
-  return _enabled;
-}
-function trapBubbledEvent(topLevelType, element) {
-  trapEventForPluginEventSystem(element, topLevelType, false);
-}
-function trapCapturedEvent(topLevelType, element) {
-  trapEventForPluginEventSystem(element, topLevelType, true);
-}
-function addResponderEventSystemEvent(document, topLevelType, passive) {
-  var eventFlags = RESPONDER_EVENT_SYSTEM; // If passive option is not supported, then the event will be
-  // active and not passive, but we flag it as using not being
-  // supported too. This way the responder event plugins know,
-  // and can provide polyfills if needed.
-
-  if (passive) {
-    if (passiveBrowserEventsSupported) {
-      eventFlags |= IS_PASSIVE;
-    } else {
-      eventFlags |= IS_ACTIVE;
-      eventFlags |= PASSIVE_NOT_SUPPORTED;
-      passive = false;
-    }
-  } else {
-    eventFlags |= IS_ACTIVE;
-  } // Check if interactive and wrap in discreteUpdates
-
-  var listener = dispatchEvent.bind(null, topLevelType, eventFlags, document);
-
-  if (passiveBrowserEventsSupported) {
-    addEventCaptureListenerWithPassiveFlag(
-      document,
-      topLevelType,
-      listener,
-      passive
-    );
-  } else {
-    addEventCaptureListener(document, topLevelType, listener);
-  }
-
-  return listener;
-}
-function removeActiveResponderEventSystemEvent(
-  document,
-  topLevelType,
-  listener
-) {
-  if (passiveBrowserEventsSupported) {
-    document.removeEventListener(topLevelType, listener, {
-      capture: true,
-      passive: false
-    });
-  } else {
-    document.removeEventListener(topLevelType, listener, true);
-  }
-}
-
-function trapEventForPluginEventSystem(container, topLevelType, capture) {
-  var listener;
-
-  switch (getEventPriorityForPluginSystem(topLevelType)) {
-    case DiscreteEvent:
-      listener = dispatchDiscreteEvent.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
-      break;
-
-    case UserBlockingEvent:
-      listener = dispatchUserBlockingUpdate.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
-      break;
-
-    case ContinuousEvent:
-    default:
-      listener = dispatchEvent.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
-      break;
-  }
-
-  var rawEventName = getRawEventName(topLevelType);
-
-  if (capture) {
-    addEventCaptureListener(container, rawEventName, listener);
-  } else {
-    addEventBubbleListener(container, rawEventName, listener);
-  }
-}
-
-function dispatchDiscreteEvent(
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  flushDiscreteUpdatesIfNeeded(nativeEvent.timeStamp);
-  discreteUpdates(
-    dispatchEvent,
-    topLevelType,
-    eventSystemFlags,
-    container,
-    nativeEvent
-  );
-}
-
-function dispatchUserBlockingUpdate(
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  runWithPriority$1(
-    UserBlockingPriority$1,
-    dispatchEvent.bind(
-      null,
-      topLevelType,
-      eventSystemFlags,
-      container,
-      nativeEvent
-    )
-  );
-}
-
-function dispatchEvent(topLevelType, eventSystemFlags, container, nativeEvent) {
-  if (!_enabled) {
-    return;
-  }
-
-  if (hasQueuedDiscreteEvents() && isReplayableDiscreteEvent(topLevelType)) {
-    // If we already have a queue of discrete events, and this is another discrete
-    // event, then we can't dispatch it regardless of its target, since they
-    // need to dispatch in order.
-    queueDiscreteEvent(
-      null, // Flags that we're not actually blocked on anything as far as we know.
-      topLevelType,
-      eventSystemFlags,
-      container,
-      nativeEvent
-    );
-    return;
-  }
-
-  var blockedOn = attemptToDispatchEvent(
-    topLevelType,
-    eventSystemFlags,
-    container,
-    nativeEvent
-  );
-
-  if (blockedOn === null) {
-    // We successfully dispatched this event.
-    clearIfContinuousEvent(topLevelType, nativeEvent);
-    return;
-  }
-
-  if (isReplayableDiscreteEvent(topLevelType)) {
-    // This this to be replayed later once the target is available.
-    queueDiscreteEvent(
-      blockedOn,
-      topLevelType,
-      eventSystemFlags,
-      container,
-      nativeEvent
-    );
-    return;
-  }
-
-  if (
-    queueIfContinuousEvent(
-      blockedOn,
-      topLevelType,
-      eventSystemFlags,
-      container,
-      nativeEvent
-    )
-  ) {
-    return;
-  } // We need to clear only if we didn't queue because
-  // queueing is accummulative.
-
-  clearIfContinuousEvent(topLevelType, nativeEvent); // This is not replayable so we'll invoke it but without a target,
-  // in case the event system needs to trace it.
-
-  {
-    if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
-      dispatchEventForLegacyPluginEventSystem(
-        topLevelType,
-        eventSystemFlags,
-        nativeEvent,
-        null
-      );
-    }
-
-    if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
-      // React Flare event system
-      DEPRECATED_dispatchEventForResponderEventSystem(
-        topLevelType,
-        null,
-        nativeEvent,
-        getEventTarget(nativeEvent),
-        eventSystemFlags
-      );
-    }
-  }
-} // Attempt dispatching an event. Returns a SuspenseInstance or Container if it's blocked.
-
-function attemptToDispatchEvent(
-  topLevelType,
-  eventSystemFlags,
-  container,
-  nativeEvent
-) {
-  // TODO: Warn if _enabled is false.
-  var nativeEventTarget = getEventTarget(nativeEvent);
-  var targetInst = getClosestInstanceFromNode(nativeEventTarget);
-
-  if (targetInst !== null) {
-    var nearestMounted = getNearestMountedFiber(targetInst);
-
-    if (nearestMounted === null) {
-      // This tree has been unmounted already. Dispatch without a target.
-      targetInst = null;
-    } else {
-      var tag = nearestMounted.tag;
-
-      if (tag === SuspenseComponent) {
-        var instance = getSuspenseInstanceFromFiber(nearestMounted);
-
-        if (instance !== null) {
-          // Queue the event to be replayed later. Abort dispatching since we
-          // don't want this event dispatched twice through the event system.
-          // TODO: If this is the first discrete event in the queue. Schedule an increased
-          // priority for this boundary.
-          return instance;
-        } // This shouldn't happen, something went wrong but to avoid blocking
-        // the whole system, dispatch the event without a target.
-        // TODO: Warn.
-
-        targetInst = null;
-      } else if (tag === HostRoot) {
-        var root = nearestMounted.stateNode;
-
-        if (root.hydrate) {
-          // If this happens during a replay something went wrong and it might block
-          // the whole system.
-          return getContainerFromFiber(nearestMounted);
-        }
-
-        targetInst = null;
-      } else if (nearestMounted !== targetInst) {
-        // If we get an event (ex: img onload) before committing that
-        // component's mount, ignore it for now (that is, treat it as if it was an
-        // event on a non-React tree). We might also consider queueing events and
-        // dispatching them after the mount.
-        targetInst = null;
-      }
-    }
-  }
-
-  {
-    if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
-      dispatchEventForLegacyPluginEventSystem(
-        topLevelType,
-        eventSystemFlags,
-        nativeEvent,
-        targetInst
-      );
-    }
-
-    if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
-      // React Flare event system
-      DEPRECATED_dispatchEventForResponderEventSystem(
-        topLevelType,
-        targetInst,
-        nativeEvent,
-        nativeEventTarget,
-        eventSystemFlags
-      );
-    }
-  } // We're not blocked on anything.
-
-  return null;
-}
-
 // List derived from Gecko source code:
 // https://github.com/mozilla/gecko-dev/blob/4e638efc71/layout/style/test/property_database.js
 var shorthandToLonghand = {
@@ -7384,6 +4854,511 @@ function validateProperties$2(type, props, canUseEventSystem) {
   }
 
   warnUnknownProperties(type, props, canUseEventSystem);
+}
+
+/**
+ * Accumulates items that must not be null or undefined into the first one. This
+ * is used to conserve memory by avoiding array allocations, and thus sacrifices
+ * API cleanness. Since `current` can be null before being passed in and not
+ * null after this function, make sure to assign it back to `current`:
+ *
+ * `a = accumulateInto(a, b);`
+ *
+ * This API should be sparingly used. Try `accumulate` for something cleaner.
+ *
+ * @return {*|array<*>} An accumulation of items.
+ */
+
+function accumulateInto(current, next) {
+  if (!(next != null)) {
+    {
+      throw Error(
+        "accumulateInto(...): Accumulated items must not be null or undefined."
+      );
+    }
+  }
+
+  if (current == null) {
+    return next;
+  } // Both are not empty. Warning: Never call x.concat(y) when you are not
+  // certain that x is an Array (x could be a string with concat method).
+
+  if (Array.isArray(current)) {
+    if (Array.isArray(next)) {
+      current.push.apply(current, next);
+      return current;
+    }
+
+    current.push(next);
+    return current;
+  }
+
+  if (Array.isArray(next)) {
+    // A bit too dangerous to mutate `next`.
+    return [current].concat(next);
+  }
+
+  return [current, next];
+}
+
+/**
+ * @param {array} arr an "accumulation" of items which is either an Array or
+ * a single item. Useful when paired with the `accumulate` module. This is a
+ * simple utility that allows us to reason about a collection of items, but
+ * handling the case when there is exactly one item (and we do not need to
+ * allocate an array).
+ * @param {function} cb Callback invoked with each element or a collection.
+ * @param {?} [scope] Scope used as `this` in a callback.
+ */
+function forEachAccumulated(arr, cb, scope) {
+  if (Array.isArray(arr)) {
+    arr.forEach(cb, scope);
+  } else if (arr) {
+    cb.call(scope, arr);
+  }
+}
+
+/**
+ * Internal queue of events that have accumulated their dispatches and are
+ * waiting to have their dispatches executed.
+ */
+
+var eventQueue = null;
+/**
+ * Dispatches an event and releases it back into the pool, unless persistent.
+ *
+ * @param {?object} event Synthetic event to be dispatched.
+ * @private
+ */
+
+var executeDispatchesAndRelease = function(event) {
+  if (event) {
+    executeDispatchesInOrder(event);
+
+    if (!event.isPersistent()) {
+      event.constructor.release(event);
+    }
+  }
+};
+
+var executeDispatchesAndReleaseTopLevel = function(e) {
+  return executeDispatchesAndRelease(e);
+};
+
+function runEventsInBatch(events) {
+  if (events !== null) {
+    eventQueue = accumulateInto(eventQueue, events);
+  } // Set `eventQueue` to null before processing it so that we can tell if more
+  // events get enqueued while processing.
+
+  var processingEventQueue = eventQueue;
+  eventQueue = null;
+
+  if (!processingEventQueue) {
+    return;
+  }
+
+  forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
+
+  if (!!eventQueue) {
+    {
+      throw Error(
+        "processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented."
+      );
+    }
+  } // This would be a good time to rethrow if any of the event handlers threw.
+
+  rethrowCaughtError();
+}
+
+/**
+ * Gets the target node from a native browser event by accounting for
+ * inconsistencies in browser DOM APIs.
+ *
+ * @param {object} nativeEvent Native browser event.
+ * @return {DOMEventTarget} Target node.
+ */
+
+function getEventTarget(nativeEvent) {
+  // Fallback to nativeEvent.srcElement for IE9
+  // https://github.com/facebook/react/issues/12506
+  var target = nativeEvent.target || nativeEvent.srcElement || window; // Normalize SVG <use> element events #4963
+
+  if (target.correspondingUseElement) {
+    target = target.correspondingUseElement;
+  } // Safari may fire events on text nodes (Node.TEXT_NODE is 3).
+  // @see http://www.quirksmode.org/js/events_properties.html
+
+  return target.nodeType === TEXT_NODE ? target.parentNode : target;
+}
+
+/**
+ * Checks if an event is supported in the current execution environment.
+ *
+ * NOTE: This will not work correctly for non-generic events such as `change`,
+ * `reset`, `load`, `error`, and `select`.
+ *
+ * Borrows from Modernizr.
+ *
+ * @param {string} eventNameSuffix Event name, e.g. "click".
+ * @return {boolean} True if the event is supported.
+ * @internal
+ * @license Modernizr 3.0.0pre (Custom Build) | MIT
+ */
+
+function isEventSupported(eventNameSuffix) {
+  if (!canUseDOM) {
+    return false;
+  }
+
+  var eventName = "on" + eventNameSuffix;
+  var isSupported = eventName in document;
+
+  if (!isSupported) {
+    var element = document.createElement("div");
+    element.setAttribute(eventName, "return;");
+    isSupported = typeof element[eventName] === "function";
+  }
+
+  return isSupported;
+}
+
+/**
+ * Summary of `DOMEventPluginSystem` event handling:
+ *
+ *  - Top-level delegation is used to trap most native browser events. This
+ *    may only occur in the main thread and is the responsibility of
+ *    ReactDOMEventListener, which is injected and can therefore support
+ *    pluggable event sources. This is the only work that occurs in the main
+ *    thread.
+ *
+ *  - We normalize and de-duplicate events to account for browser quirks. This
+ *    may be done in the worker thread.
+ *
+ *  - Forward these native events (with the associated top-level type used to
+ *    trap it) to `EventPluginRegistry`, which in turn will ask plugins if they want
+ *    to extract any synthetic events.
+ *
+ *  - The `EventPluginRegistry` will then process each event by annotating them with
+ *    "dispatches", a sequence of listeners and IDs that care about that event.
+ *
+ *  - The `EventPluginRegistry` then dispatches the events.
+ *
+ * Overview of React and the event system:
+ *
+ * +------------+    .
+ * |    DOM     |    .
+ * +------------+    .
+ *       |           .
+ *       v           .
+ * +------------+    .
+ * | ReactEvent |    .
+ * |  Listener  |    .
+ * +------------+    .                         +-----------+
+ *       |           .               +--------+|SimpleEvent|
+ *       |           .               |         |Plugin     |
+ * +-----|------+    .               v         +-----------+
+ * |     |      |    .    +--------------+                    +------------+
+ * |     +-----------.--->|PluginRegistry|                    |    Event   |
+ * |            |    .    |              |     +-----------+  | Propagators|
+ * | ReactEvent |    .    |              |     |TapEvent   |  |------------|
+ * |  Emitter   |    .    |              |<---+|Plugin     |  |other plugin|
+ * |            |    .    |              |     +-----------+  |  utilities |
+ * |     +-----------.--->|              |                    +------------+
+ * |     |      |    .    +--------------+
+ * +-----|------+    .                ^        +-----------+
+ *       |           .                |        |Enter/Leave|
+ *       +           .                +-------+|Plugin     |
+ * +-------------+   .                         +-----------+
+ * | application |   .
+ * |-------------|   .
+ * |             |   .
+ * |             |   .
+ * +-------------+   .
+ *                   .
+ *    React Core     .  General Purpose Event Plugin System
+ */
+
+var CALLBACK_BOOKKEEPING_POOL_SIZE = 10;
+var callbackBookkeepingPool = [];
+
+function releaseTopLevelCallbackBookKeeping(instance) {
+  instance.topLevelType = null;
+  instance.nativeEvent = null;
+  instance.targetInst = null;
+  instance.ancestors.length = 0;
+
+  if (callbackBookkeepingPool.length < CALLBACK_BOOKKEEPING_POOL_SIZE) {
+    callbackBookkeepingPool.push(instance);
+  }
+} // Used to store ancestor hierarchy in top level callback
+
+function getTopLevelCallbackBookKeeping(
+  topLevelType,
+  nativeEvent,
+  targetInst,
+  eventSystemFlags
+) {
+  if (callbackBookkeepingPool.length) {
+    var instance = callbackBookkeepingPool.pop();
+    instance.topLevelType = topLevelType;
+    instance.eventSystemFlags = eventSystemFlags;
+    instance.nativeEvent = nativeEvent;
+    instance.targetInst = targetInst;
+    return instance;
+  }
+
+  return {
+    topLevelType: topLevelType,
+    eventSystemFlags: eventSystemFlags,
+    nativeEvent: nativeEvent,
+    targetInst: targetInst,
+    ancestors: []
+  };
+}
+/**
+ * Find the deepest React component completely containing the root of the
+ * passed-in instance (for use when entire React trees are nested within each
+ * other). If React trees are not nested, returns null.
+ */
+
+function findRootContainerNode(inst) {
+  if (inst.tag === HostRoot) {
+    return inst.stateNode.containerInfo;
+  } // TODO: It may be a good idea to cache this to prevent unnecessary DOM
+  // traversal, but caching is difficult to do correctly without using a
+  // mutation observer to listen for all DOM changes.
+
+  while (inst.return) {
+    inst = inst.return;
+  }
+
+  if (inst.tag !== HostRoot) {
+    // This can happen if we're in a detached tree.
+    return null;
+  }
+
+  return inst.stateNode.containerInfo;
+}
+/**
+ * Allows registered plugins an opportunity to extract events from top-level
+ * native browser events.
+ *
+ * @return {*} An accumulation of synthetic events.
+ * @internal
+ */
+
+function extractPluginEvents(
+  topLevelType,
+  targetInst,
+  nativeEvent,
+  nativeEventTarget,
+  eventSystemFlags
+) {
+  var events = null;
+
+  for (var i = 0; i < plugins.length; i++) {
+    // Not every plugin in the ordering may be loaded at runtime.
+    var possiblePlugin = plugins[i];
+
+    if (possiblePlugin) {
+      var extractedEvents = possiblePlugin.extractEvents(
+        topLevelType,
+        targetInst,
+        nativeEvent,
+        nativeEventTarget,
+        eventSystemFlags
+      );
+
+      if (extractedEvents) {
+        events = accumulateInto(events, extractedEvents);
+      }
+    }
+  }
+
+  return events;
+}
+
+function runExtractedPluginEventsInBatch(
+  topLevelType,
+  targetInst,
+  nativeEvent,
+  nativeEventTarget,
+  eventSystemFlags
+) {
+  var events = extractPluginEvents(
+    topLevelType,
+    targetInst,
+    nativeEvent,
+    nativeEventTarget,
+    eventSystemFlags
+  );
+  runEventsInBatch(events);
+}
+
+function handleTopLevel(bookKeeping) {
+  var targetInst = bookKeeping.targetInst; // Loop through the hierarchy, in case there's any nested components.
+  // It's important that we build the array of ancestors before calling any
+  // event handlers, because event handlers can modify the DOM, leading to
+  // inconsistencies with ReactMount's node cache. See #1105.
+
+  var ancestor = targetInst;
+
+  do {
+    if (!ancestor) {
+      var ancestors = bookKeeping.ancestors;
+      ancestors.push(ancestor);
+      break;
+    }
+
+    var root = findRootContainerNode(ancestor);
+
+    if (!root) {
+      break;
+    }
+
+    var tag = ancestor.tag;
+
+    if (tag === HostComponent || tag === HostText) {
+      bookKeeping.ancestors.push(ancestor);
+    }
+
+    ancestor = getClosestInstanceFromNode(root);
+  } while (ancestor);
+
+  for (var i = 0; i < bookKeeping.ancestors.length; i++) {
+    targetInst = bookKeeping.ancestors[i];
+    var eventTarget = getEventTarget(bookKeeping.nativeEvent);
+    var topLevelType = bookKeeping.topLevelType;
+    var nativeEvent = bookKeeping.nativeEvent;
+    var eventSystemFlags = bookKeeping.eventSystemFlags; // If this is the first ancestor, we mark it on the system flags
+
+    if (i === 0) {
+      eventSystemFlags |= IS_FIRST_ANCESTOR;
+    }
+
+    runExtractedPluginEventsInBatch(
+      topLevelType,
+      targetInst,
+      nativeEvent,
+      eventTarget,
+      eventSystemFlags
+    );
+  }
+}
+
+function dispatchEventForLegacyPluginEventSystem(
+  topLevelType,
+  eventSystemFlags,
+  nativeEvent,
+  targetInst
+) {
+  var bookKeeping = getTopLevelCallbackBookKeeping(
+    topLevelType,
+    nativeEvent,
+    targetInst,
+    eventSystemFlags
+  );
+
+  try {
+    // Event queue being processed in the same cycle allows
+    // `preventDefault`.
+    batchedEventUpdates(handleTopLevel, bookKeeping);
+  } finally {
+    releaseTopLevelCallbackBookKeeping(bookKeeping);
+  }
+}
+/**
+ * We listen for bubbled touch events on the document object.
+ *
+ * Firefox v8.01 (and possibly others) exhibited strange behavior when
+ * mounting `onmousemove` events at some node that was not the document
+ * element. The symptoms were that if your mouse is not moving over something
+ * contained within that mount point (for example on the background) the
+ * top-level listeners for `onmousemove` won't be called. However, if you
+ * register the `mousemove` on the document object, then it will of course
+ * catch all `mousemove`s. This along with iOS quirks, justifies restricting
+ * top-level listeners to the document object only, at least for these
+ * movement types of events and possibly all events.
+ *
+ * @see http://www.quirksmode.org/blog/archives/2010/09/click_event_del.html
+ *
+ * Also, `keyup`/`keypress`/`keydown` do not bubble to the window on IE, but
+ * they bubble to document.
+ *
+ * @param {string} registrationName Name of listener (e.g. `onClick`).
+ * @param {object} mountAt Container where to mount the listener
+ */
+
+function legacyListenToEvent(registrationName, mountAt) {
+  var listenerMap = getListenerMapForElement(mountAt);
+  var dependencies = registrationNameDependencies[registrationName];
+
+  for (var i = 0; i < dependencies.length; i++) {
+    var dependency = dependencies[i];
+    legacyListenToTopLevelEvent(dependency, mountAt, listenerMap);
+  }
+}
+function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
+  if (!listenerMap.has(topLevelType)) {
+    switch (topLevelType) {
+      case TOP_SCROLL:
+        trapCapturedEvent(TOP_SCROLL, mountAt);
+        break;
+
+      case TOP_FOCUS:
+      case TOP_BLUR:
+        trapCapturedEvent(TOP_FOCUS, mountAt);
+        trapCapturedEvent(TOP_BLUR, mountAt); // We set the flag for a single dependency later in this function,
+        // but this ensures we mark both as attached rather than just one.
+
+        listenerMap.set(TOP_BLUR, null);
+        listenerMap.set(TOP_FOCUS, null);
+        break;
+
+      case TOP_CANCEL:
+      case TOP_CLOSE:
+        if (isEventSupported(getRawEventName(topLevelType))) {
+          trapCapturedEvent(topLevelType, mountAt);
+        }
+
+        break;
+
+      case TOP_INVALID:
+      case TOP_SUBMIT:
+      case TOP_RESET:
+        // We listen to them on the target DOM elements.
+        // Some of them bubble so we don't want them to fire twice.
+        break;
+
+      default:
+        // By default, listen on the top level to all non-media events.
+        // Media events don't bubble so adding the listener wouldn't do anything.
+        var isMediaEvent = mediaEventTypes.indexOf(topLevelType) !== -1;
+
+        if (!isMediaEvent) {
+          trapBubbledEvent(topLevelType, mountAt);
+        }
+
+        break;
+    }
+
+    listenerMap.set(topLevelType, null);
+  }
+}
+function isListeningToAllDependencies(registrationName, mountAt) {
+  var listenerMap = getListenerMapForElement(mountAt);
+  var dependencies = registrationNameDependencies[registrationName];
+
+  for (var i = 0; i < dependencies.length; i++) {
+    var dependency = dependencies[i];
+
+    if (!listenerMap.has(dependency)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 var didWarnInvalidHydration = false;
@@ -9603,6 +7578,995 @@ var updatedAncestorInfo = function() {};
   };
 }
 
+/**
+ * `ReactInstanceMap` maintains a mapping from a public facing stateful
+ * instance (key) and the internal representation (value). This allows public
+ * methods to accept the user facing instance as an argument and map them back
+ * to internal methods.
+ *
+ * Note that this module is currently shared and assumed to be stateless.
+ * If this becomes an actual Map, that will break.
+ */
+function get(key) {
+  return key._reactInternalFiber;
+}
+function has(key) {
+  return key._reactInternalFiber !== undefined;
+}
+function set(key, value) {
+  key._reactInternalFiber = value;
+}
+
+// Don't change these two values. They're used by React Dev Tools.
+var NoEffect =
+  /*              */
+  0;
+var PerformedWork =
+  /*         */
+  1; // You can change the rest (and add more).
+
+var Placement =
+  /*             */
+  2;
+var Update =
+  /*                */
+  4;
+var PlacementAndUpdate =
+  /*    */
+  6;
+var Deletion =
+  /*              */
+  8;
+var ContentReset =
+  /*          */
+  16;
+var Callback =
+  /*              */
+  32;
+var DidCapture =
+  /*            */
+  64;
+var Ref =
+  /*                   */
+  128;
+var Snapshot =
+  /*              */
+  256;
+var Passive =
+  /*               */
+  512;
+var Hydrating =
+  /*             */
+  1024;
+var HydratingAndUpdate =
+  /*    */
+  1028; // Passive & Update & Callback & Ref & Snapshot
+
+var LifecycleEffectMask =
+  /*   */
+  932; // Union of all host effects
+
+var HostEffectMask =
+  /*        */
+  2047;
+var Incomplete =
+  /*            */
+  2048;
+var ShouldCapture =
+  /*         */
+  4096;
+
+var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
+function getNearestMountedFiber(fiber) {
+  var node = fiber;
+  var nearestMounted = fiber;
+
+  if (!fiber.alternate) {
+    // If there is no alternate, this might be a new tree that isn't inserted
+    // yet. If it is, then it will have a pending insertion effect on it.
+    var nextNode = node;
+
+    do {
+      node = nextNode;
+
+      if ((node.effectTag & (Placement | Hydrating)) !== NoEffect) {
+        // This is an insertion or in-progress hydration. The nearest possible
+        // mounted fiber is the parent but we need to continue to figure out
+        // if that one is still mounted.
+        nearestMounted = node.return;
+      }
+
+      nextNode = node.return;
+    } while (nextNode);
+  } else {
+    while (node.return) {
+      node = node.return;
+    }
+  }
+
+  if (node.tag === HostRoot) {
+    // TODO: Check if this was a nested HostRoot when used with
+    // renderContainerIntoSubtree.
+    return nearestMounted;
+  } // If we didn't hit the root, that means that we're in an disconnected tree
+  // that has been unmounted.
+
+  return null;
+}
+function getSuspenseInstanceFromFiber(fiber) {
+  if (fiber.tag === SuspenseComponent) {
+    var suspenseState = fiber.memoizedState;
+
+    if (suspenseState === null) {
+      var current = fiber.alternate;
+
+      if (current !== null) {
+        suspenseState = current.memoizedState;
+      }
+    }
+
+    if (suspenseState !== null) {
+      return suspenseState.dehydrated;
+    }
+  }
+
+  return null;
+}
+function getContainerFromFiber(fiber) {
+  return fiber.tag === HostRoot ? fiber.stateNode.containerInfo : null;
+}
+function isFiberMounted(fiber) {
+  return getNearestMountedFiber(fiber) === fiber;
+}
+function isMounted(component) {
+  {
+    var owner = ReactCurrentOwner.current;
+
+    if (owner !== null && owner.tag === ClassComponent) {
+      var ownerFiber = owner;
+      var instance = ownerFiber.stateNode;
+
+      if (!instance._warnedAboutRefsInRender) {
+        error(
+          "%s is accessing isMounted inside its render() function. " +
+            "render() should be a pure function of props and state. It should " +
+            "never access something that requires stale data from the previous " +
+            "render, such as refs. Move this logic to componentDidMount and " +
+            "componentDidUpdate instead.",
+          getComponentName(ownerFiber.type) || "A component"
+        );
+      }
+
+      instance._warnedAboutRefsInRender = true;
+    }
+  }
+
+  var fiber = get(component);
+
+  if (!fiber) {
+    return false;
+  }
+
+  return getNearestMountedFiber(fiber) === fiber;
+}
+
+function assertIsMounted(fiber) {
+  if (!(getNearestMountedFiber(fiber) === fiber)) {
+    {
+      throw Error("Unable to find node on an unmounted component.");
+    }
+  }
+}
+
+function findCurrentFiberUsingSlowPath(fiber) {
+  var alternate = fiber.alternate;
+
+  if (!alternate) {
+    // If there is no alternate, then we only need to check if it is mounted.
+    var nearestMounted = getNearestMountedFiber(fiber);
+
+    if (!(nearestMounted !== null)) {
+      {
+        throw Error("Unable to find node on an unmounted component.");
+      }
+    }
+
+    if (nearestMounted !== fiber) {
+      return null;
+    }
+
+    return fiber;
+  } // If we have two possible branches, we'll walk backwards up to the root
+  // to see what path the root points to. On the way we may hit one of the
+  // special cases and we'll deal with them.
+
+  var a = fiber;
+  var b = alternate;
+
+  while (true) {
+    var parentA = a.return;
+
+    if (parentA === null) {
+      // We're at the root.
+      break;
+    }
+
+    var parentB = parentA.alternate;
+
+    if (parentB === null) {
+      // There is no alternate. This is an unusual case. Currently, it only
+      // happens when a Suspense component is hidden. An extra fragment fiber
+      // is inserted in between the Suspense fiber and its children. Skip
+      // over this extra fragment fiber and proceed to the next parent.
+      var nextParent = parentA.return;
+
+      if (nextParent !== null) {
+        a = b = nextParent;
+        continue;
+      } // If there's no parent, we're at the root.
+
+      break;
+    } // If both copies of the parent fiber point to the same child, we can
+    // assume that the child is current. This happens when we bailout on low
+    // priority: the bailed out fiber's child reuses the current child.
+
+    if (parentA.child === parentB.child) {
+      var child = parentA.child;
+
+      while (child) {
+        if (child === a) {
+          // We've determined that A is the current branch.
+          assertIsMounted(parentA);
+          return fiber;
+        }
+
+        if (child === b) {
+          // We've determined that B is the current branch.
+          assertIsMounted(parentA);
+          return alternate;
+        }
+
+        child = child.sibling;
+      } // We should never have an alternate for any mounting node. So the only
+      // way this could possibly happen is if this was unmounted, if at all.
+
+      {
+        {
+          throw Error("Unable to find node on an unmounted component.");
+        }
+      }
+    }
+
+    if (a.return !== b.return) {
+      // The return pointer of A and the return pointer of B point to different
+      // fibers. We assume that return pointers never criss-cross, so A must
+      // belong to the child set of A.return, and B must belong to the child
+      // set of B.return.
+      a = parentA;
+      b = parentB;
+    } else {
+      // The return pointers point to the same fiber. We'll have to use the
+      // default, slow path: scan the child sets of each parent alternate to see
+      // which child belongs to which set.
+      //
+      // Search parent A's child set
+      var didFindChild = false;
+      var _child = parentA.child;
+
+      while (_child) {
+        if (_child === a) {
+          didFindChild = true;
+          a = parentA;
+          b = parentB;
+          break;
+        }
+
+        if (_child === b) {
+          didFindChild = true;
+          b = parentA;
+          a = parentB;
+          break;
+        }
+
+        _child = _child.sibling;
+      }
+
+      if (!didFindChild) {
+        // Search parent B's child set
+        _child = parentB.child;
+
+        while (_child) {
+          if (_child === a) {
+            didFindChild = true;
+            a = parentB;
+            b = parentA;
+            break;
+          }
+
+          if (_child === b) {
+            didFindChild = true;
+            b = parentB;
+            a = parentA;
+            break;
+          }
+
+          _child = _child.sibling;
+        }
+
+        if (!didFindChild) {
+          {
+            throw Error(
+              "Child was not found in either parent set. This indicates a bug in React related to the return pointer. Please file an issue."
+            );
+          }
+        }
+      }
+    }
+
+    if (!(a.alternate === b)) {
+      {
+        throw Error(
+          "Return fibers should always be each others' alternates. This error is likely caused by a bug in React. Please file an issue."
+        );
+      }
+    }
+  } // If the root is not a host container, we're in a disconnected tree. I.e.
+  // unmounted.
+
+  if (!(a.tag === HostRoot)) {
+    {
+      throw Error("Unable to find node on an unmounted component.");
+    }
+  }
+
+  if (a.stateNode.current === a) {
+    // We've determined that A is the current branch.
+    return fiber;
+  } // Otherwise B has to be current branch.
+
+  return alternate;
+}
+function findCurrentHostFiber(parent) {
+  var currentParent = findCurrentFiberUsingSlowPath(parent);
+
+  if (!currentParent) {
+    return null;
+  } // Next we'll drill down this component to find the first HostComponent/Text.
+
+  var node = currentParent;
+
+  while (true) {
+    if (node.tag === HostComponent || node.tag === HostText) {
+      return node;
+    } else if (node.child) {
+      node.child.return = node;
+      node = node.child;
+      continue;
+    }
+
+    if (node === currentParent) {
+      return null;
+    }
+
+    while (!node.sibling) {
+      if (!node.return || node.return === currentParent) {
+        return null;
+      }
+
+      node = node.return;
+    }
+
+    node.sibling.return = node.return;
+    node = node.sibling;
+  } // Flow needs the return null here, but ESLint complains about it.
+  // eslint-disable-next-line no-unreachable
+
+  return null;
+}
+function findCurrentHostFiberWithNoPortals(parent) {
+  var currentParent = findCurrentFiberUsingSlowPath(parent);
+
+  if (!currentParent) {
+    return null;
+  } // Next we'll drill down this component to find the first HostComponent/Text.
+
+  var node = currentParent;
+
+  while (true) {
+    if (
+      node.tag === HostComponent ||
+      node.tag === HostText ||
+      enableFundamentalAPI
+    ) {
+      return node;
+    } else if (node.child && node.tag !== HostPortal) {
+      node.child.return = node;
+      node = node.child;
+      continue;
+    }
+
+    if (node === currentParent) {
+      return null;
+    }
+
+    while (!node.sibling) {
+      if (!node.return || node.return === currentParent) {
+        return null;
+      }
+
+      node = node.return;
+    }
+
+    node.sibling.return = node.return;
+    node = node.sibling;
+  } // Flow needs the return null here, but ESLint complains about it.
+  // eslint-disable-next-line no-unreachable
+
+  return null;
+}
+
+var attemptSynchronousHydration;
+function setAttemptSynchronousHydration(fn) {
+  attemptSynchronousHydration = fn;
+}
+var attemptUserBlockingHydration;
+function setAttemptUserBlockingHydration(fn) {
+  attemptUserBlockingHydration = fn;
+}
+var attemptContinuousHydration;
+function setAttemptContinuousHydration(fn) {
+  attemptContinuousHydration = fn;
+}
+var attemptHydrationAtCurrentPriority;
+function setAttemptHydrationAtCurrentPriority(fn) {
+  attemptHydrationAtCurrentPriority = fn;
+} // TODO: Upgrade this definition once we're on a newer version of Flow that
+var hasScheduledReplayAttempt = false; // The queue of discrete events to be replayed.
+
+var queuedDiscreteEvents = []; // Indicates if any continuous event targets are non-null for early bailout.
+// if the last target was dehydrated.
+
+var queuedFocus = null;
+var queuedDrag = null;
+var queuedMouse = null; // For pointer events there can be one latest event per pointerId.
+
+var queuedPointers = new Map();
+var queuedPointerCaptures = new Map(); // We could consider replaying selectionchange and touchmoves too.
+
+var queuedExplicitHydrationTargets = [];
+function hasQueuedDiscreteEvents() {
+  return queuedDiscreteEvents.length > 0;
+}
+var discreteReplayableEvents = [
+  TOP_MOUSE_DOWN,
+  TOP_MOUSE_UP,
+  TOP_TOUCH_CANCEL,
+  TOP_TOUCH_END,
+  TOP_TOUCH_START,
+  TOP_AUX_CLICK,
+  TOP_DOUBLE_CLICK,
+  TOP_POINTER_CANCEL,
+  TOP_POINTER_DOWN,
+  TOP_POINTER_UP,
+  TOP_DRAG_END,
+  TOP_DRAG_START,
+  TOP_DROP,
+  TOP_COMPOSITION_END,
+  TOP_COMPOSITION_START,
+  TOP_KEY_DOWN,
+  TOP_KEY_PRESS,
+  TOP_KEY_UP,
+  TOP_INPUT,
+  TOP_TEXT_INPUT,
+  TOP_CLOSE,
+  TOP_CANCEL,
+  TOP_COPY,
+  TOP_CUT,
+  TOP_PASTE,
+  TOP_CLICK,
+  TOP_CHANGE,
+  TOP_CONTEXT_MENU,
+  TOP_RESET,
+  TOP_SUBMIT
+];
+var continuousReplayableEvents = [
+  TOP_FOCUS,
+  TOP_BLUR,
+  TOP_DRAG_ENTER,
+  TOP_DRAG_LEAVE,
+  TOP_MOUSE_OVER,
+  TOP_MOUSE_OUT,
+  TOP_POINTER_OVER,
+  TOP_POINTER_OUT,
+  TOP_GOT_POINTER_CAPTURE,
+  TOP_LOST_POINTER_CAPTURE
+];
+function isReplayableDiscreteEvent(eventType) {
+  return discreteReplayableEvents.indexOf(eventType) > -1;
+}
+
+function trapReplayableEventForDocument(topLevelType, document, listenerMap) {
+  legacyListenToTopLevelEvent(topLevelType, document, listenerMap);
+
+  {
+    // Trap events for the responder system.
+    var topLevelTypeString = unsafeCastDOMTopLevelTypeToString(topLevelType); // TODO: Ideally we shouldn't need these to be active but
+    // if we only have a passive listener, we at least need it
+    // to still pretend to be active so that Flare gets those
+    // events.
+
+    var activeEventKey = topLevelTypeString + "_active";
+
+    if (!listenerMap.has(activeEventKey)) {
+      var listener = addResponderEventSystemEvent(
+        document,
+        topLevelTypeString,
+        false
+      );
+      listenerMap.set(activeEventKey, listener);
+    }
+  }
+}
+
+function eagerlyTrapReplayableEvents(container, document) {
+  var listenerMapForDoc = getListenerMapForElement(document); // Discrete
+
+  discreteReplayableEvents.forEach(function(topLevelType) {
+    trapReplayableEventForDocument(topLevelType, document, listenerMapForDoc);
+  }); // Continuous
+
+  continuousReplayableEvents.forEach(function(topLevelType) {
+    trapReplayableEventForDocument(topLevelType, document, listenerMapForDoc);
+  });
+}
+
+function createQueuedReplayableEvent(
+  blockedOn,
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  return {
+    blockedOn: blockedOn,
+    topLevelType: topLevelType,
+    eventSystemFlags: eventSystemFlags | IS_REPLAYED,
+    nativeEvent: nativeEvent,
+    container: container
+  };
+}
+
+function queueDiscreteEvent(
+  blockedOn,
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  var queuedEvent = createQueuedReplayableEvent(
+    blockedOn,
+    topLevelType,
+    eventSystemFlags,
+    container,
+    nativeEvent
+  );
+  queuedDiscreteEvents.push(queuedEvent);
+
+  {
+    if (queuedDiscreteEvents.length === 1) {
+      // If this was the first discrete event, we might be able to
+      // synchronously unblock it so that preventDefault still works.
+      while (queuedEvent.blockedOn !== null) {
+        var _fiber = getInstanceFromNode$2(queuedEvent.blockedOn);
+
+        if (_fiber === null) {
+          break;
+        }
+
+        attemptSynchronousHydration(_fiber);
+
+        if (queuedEvent.blockedOn === null) {
+          // We got unblocked by hydration. Let's try again.
+          replayUnblockedEvents(); // If we're reblocked, on an inner boundary, we might need
+          // to attempt hydrating that one.
+
+          continue;
+        } else {
+          // We're still blocked from hydration, we have to give up
+          // and replay later.
+          break;
+        }
+      }
+    }
+  }
+} // Resets the replaying for this type of continuous event to no event.
+
+function clearIfContinuousEvent(topLevelType, nativeEvent) {
+  switch (topLevelType) {
+    case TOP_FOCUS:
+    case TOP_BLUR:
+      queuedFocus = null;
+      break;
+
+    case TOP_DRAG_ENTER:
+    case TOP_DRAG_LEAVE:
+      queuedDrag = null;
+      break;
+
+    case TOP_MOUSE_OVER:
+    case TOP_MOUSE_OUT:
+      queuedMouse = null;
+      break;
+
+    case TOP_POINTER_OVER:
+    case TOP_POINTER_OUT: {
+      var pointerId = nativeEvent.pointerId;
+      queuedPointers.delete(pointerId);
+      break;
+    }
+
+    case TOP_GOT_POINTER_CAPTURE:
+    case TOP_LOST_POINTER_CAPTURE: {
+      var _pointerId = nativeEvent.pointerId;
+      queuedPointerCaptures.delete(_pointerId);
+      break;
+    }
+  }
+}
+
+function accumulateOrCreateContinuousQueuedReplayableEvent(
+  existingQueuedEvent,
+  blockedOn,
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  if (
+    existingQueuedEvent === null ||
+    existingQueuedEvent.nativeEvent !== nativeEvent
+  ) {
+    var queuedEvent = createQueuedReplayableEvent(
+      blockedOn,
+      topLevelType,
+      eventSystemFlags,
+      container,
+      nativeEvent
+    );
+
+    if (blockedOn !== null) {
+      var _fiber2 = getInstanceFromNode$2(blockedOn);
+
+      if (_fiber2 !== null) {
+        // Attempt to increase the priority of this target.
+        attemptContinuousHydration(_fiber2);
+      }
+    }
+
+    return queuedEvent;
+  } // If we have already queued this exact event, then it's because
+  // the different event systems have different DOM event listeners.
+  // We can accumulate the flags and store a single event to be
+  // replayed.
+
+  existingQueuedEvent.eventSystemFlags |= eventSystemFlags;
+  return existingQueuedEvent;
+}
+
+function queueIfContinuousEvent(
+  blockedOn,
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  // These set relatedTarget to null because the replayed event will be treated as if we
+  // moved from outside the window (no target) onto the target once it hydrates.
+  // Instead of mutating we could clone the event.
+  switch (topLevelType) {
+    case TOP_FOCUS: {
+      var focusEvent = nativeEvent;
+      queuedFocus = accumulateOrCreateContinuousQueuedReplayableEvent(
+        queuedFocus,
+        blockedOn,
+        topLevelType,
+        eventSystemFlags,
+        container,
+        focusEvent
+      );
+      return true;
+    }
+
+    case TOP_DRAG_ENTER: {
+      var dragEvent = nativeEvent;
+      queuedDrag = accumulateOrCreateContinuousQueuedReplayableEvent(
+        queuedDrag,
+        blockedOn,
+        topLevelType,
+        eventSystemFlags,
+        container,
+        dragEvent
+      );
+      return true;
+    }
+
+    case TOP_MOUSE_OVER: {
+      var mouseEvent = nativeEvent;
+      queuedMouse = accumulateOrCreateContinuousQueuedReplayableEvent(
+        queuedMouse,
+        blockedOn,
+        topLevelType,
+        eventSystemFlags,
+        container,
+        mouseEvent
+      );
+      return true;
+    }
+
+    case TOP_POINTER_OVER: {
+      var pointerEvent = nativeEvent;
+      var pointerId = pointerEvent.pointerId;
+      queuedPointers.set(
+        pointerId,
+        accumulateOrCreateContinuousQueuedReplayableEvent(
+          queuedPointers.get(pointerId) || null,
+          blockedOn,
+          topLevelType,
+          eventSystemFlags,
+          container,
+          pointerEvent
+        )
+      );
+      return true;
+    }
+
+    case TOP_GOT_POINTER_CAPTURE: {
+      var _pointerEvent = nativeEvent;
+      var _pointerId2 = _pointerEvent.pointerId;
+      queuedPointerCaptures.set(
+        _pointerId2,
+        accumulateOrCreateContinuousQueuedReplayableEvent(
+          queuedPointerCaptures.get(_pointerId2) || null,
+          blockedOn,
+          topLevelType,
+          eventSystemFlags,
+          container,
+          _pointerEvent
+        )
+      );
+      return true;
+    }
+  }
+
+  return false;
+} // Check if this target is unblocked. Returns true if it's unblocked.
+
+function attemptExplicitHydrationTarget(queuedTarget) {
+  // TODO: This function shares a lot of logic with attemptToDispatchEvent.
+  // Try to unify them. It's a bit tricky since it would require two return
+  // values.
+  var targetInst = getClosestInstanceFromNode(queuedTarget.target);
+
+  if (targetInst !== null) {
+    var nearestMounted = getNearestMountedFiber(targetInst);
+
+    if (nearestMounted !== null) {
+      var tag = nearestMounted.tag;
+
+      if (tag === SuspenseComponent) {
+        var instance = getSuspenseInstanceFromFiber(nearestMounted);
+
+        if (instance !== null) {
+          // We're blocked on hydrating this boundary.
+          // Increase its priority.
+          queuedTarget.blockedOn = instance;
+          Scheduler.unstable_runWithPriority(queuedTarget.priority, function() {
+            attemptHydrationAtCurrentPriority(nearestMounted);
+          });
+          return;
+        }
+      } else if (tag === HostRoot) {
+        var root = nearestMounted.stateNode;
+
+        if (root.hydrate) {
+          queuedTarget.blockedOn = getContainerFromFiber(nearestMounted); // We don't currently have a way to increase the priority of
+          // a root other than sync.
+
+          return;
+        }
+      }
+    }
+  }
+
+  queuedTarget.blockedOn = null;
+}
+
+function queueExplicitHydrationTarget(target) {
+  {
+    var priority = Scheduler.unstable_getCurrentPriorityLevel();
+    var queuedTarget = {
+      blockedOn: null,
+      target: target,
+      priority: priority
+    };
+    var i = 0;
+
+    for (; i < queuedExplicitHydrationTargets.length; i++) {
+      if (priority <= queuedExplicitHydrationTargets[i].priority) {
+        break;
+      }
+    }
+
+    queuedExplicitHydrationTargets.splice(i, 0, queuedTarget);
+
+    if (i === 0) {
+      attemptExplicitHydrationTarget(queuedTarget);
+    }
+  }
+}
+
+function attemptReplayContinuousQueuedEvent(queuedEvent) {
+  if (queuedEvent.blockedOn !== null) {
+    return false;
+  }
+
+  var nextBlockedOn = attemptToDispatchEvent(
+    queuedEvent.topLevelType,
+    queuedEvent.eventSystemFlags,
+    queuedEvent.container,
+    queuedEvent.nativeEvent
+  );
+
+  if (nextBlockedOn !== null) {
+    // We're still blocked. Try again later.
+    var _fiber3 = getInstanceFromNode$2(nextBlockedOn);
+
+    if (_fiber3 !== null) {
+      attemptContinuousHydration(_fiber3);
+    }
+
+    queuedEvent.blockedOn = nextBlockedOn;
+    return false;
+  }
+
+  return true;
+}
+
+function attemptReplayContinuousQueuedEventInMap(queuedEvent, key, map) {
+  if (attemptReplayContinuousQueuedEvent(queuedEvent)) {
+    map.delete(key);
+  }
+}
+
+function replayUnblockedEvents() {
+  hasScheduledReplayAttempt = false; // First replay discrete events.
+
+  while (queuedDiscreteEvents.length > 0) {
+    var nextDiscreteEvent = queuedDiscreteEvents[0];
+
+    if (nextDiscreteEvent.blockedOn !== null) {
+      // We're still blocked.
+      // Increase the priority of this boundary to unblock
+      // the next discrete event.
+      var _fiber4 = getInstanceFromNode$2(nextDiscreteEvent.blockedOn);
+
+      if (_fiber4 !== null) {
+        attemptUserBlockingHydration(_fiber4);
+      }
+
+      break;
+    }
+
+    var nextBlockedOn = attemptToDispatchEvent(
+      nextDiscreteEvent.topLevelType,
+      nextDiscreteEvent.eventSystemFlags,
+      nextDiscreteEvent.container,
+      nextDiscreteEvent.nativeEvent
+    );
+
+    if (nextBlockedOn !== null) {
+      // We're still blocked. Try again later.
+      nextDiscreteEvent.blockedOn = nextBlockedOn;
+    } else {
+      // We've successfully replayed the first event. Let's try the next one.
+      queuedDiscreteEvents.shift();
+    }
+  } // Next replay any continuous events.
+
+  if (queuedFocus !== null && attemptReplayContinuousQueuedEvent(queuedFocus)) {
+    queuedFocus = null;
+  }
+
+  if (queuedDrag !== null && attemptReplayContinuousQueuedEvent(queuedDrag)) {
+    queuedDrag = null;
+  }
+
+  if (queuedMouse !== null && attemptReplayContinuousQueuedEvent(queuedMouse)) {
+    queuedMouse = null;
+  }
+
+  queuedPointers.forEach(attemptReplayContinuousQueuedEventInMap);
+  queuedPointerCaptures.forEach(attemptReplayContinuousQueuedEventInMap);
+}
+
+function scheduleCallbackIfUnblocked(queuedEvent, unblocked) {
+  if (queuedEvent.blockedOn === unblocked) {
+    queuedEvent.blockedOn = null;
+
+    if (!hasScheduledReplayAttempt) {
+      hasScheduledReplayAttempt = true; // Schedule a callback to attempt replaying as many events as are
+      // now unblocked. This first might not actually be unblocked yet.
+      // We could check it early to avoid scheduling an unnecessary callback.
+
+      Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_NormalPriority,
+        replayUnblockedEvents
+      );
+    }
+  }
+}
+
+function retryIfBlockedOn(unblocked) {
+  // Mark anything that was blocked on this as no longer blocked
+  // and eligible for a replay.
+  if (queuedDiscreteEvents.length > 0) {
+    scheduleCallbackIfUnblocked(queuedDiscreteEvents[0], unblocked); // This is a exponential search for each boundary that commits. I think it's
+    // worth it because we expect very few discrete events to queue up and once
+    // we are actually fully unblocked it will be fast to replay them.
+
+    for (var i = 1; i < queuedDiscreteEvents.length; i++) {
+      var queuedEvent = queuedDiscreteEvents[i];
+
+      if (queuedEvent.blockedOn === unblocked) {
+        queuedEvent.blockedOn = null;
+      }
+    }
+  }
+
+  if (queuedFocus !== null) {
+    scheduleCallbackIfUnblocked(queuedFocus, unblocked);
+  }
+
+  if (queuedDrag !== null) {
+    scheduleCallbackIfUnblocked(queuedDrag, unblocked);
+  }
+
+  if (queuedMouse !== null) {
+    scheduleCallbackIfUnblocked(queuedMouse, unblocked);
+  }
+
+  var unblock = function(queuedEvent) {
+    return scheduleCallbackIfUnblocked(queuedEvent, unblocked);
+  };
+
+  queuedPointers.forEach(unblock);
+  queuedPointerCaptures.forEach(unblock);
+
+  for (var _i = 0; _i < queuedExplicitHydrationTargets.length; _i++) {
+    var queuedTarget = queuedExplicitHydrationTargets[_i];
+
+    if (queuedTarget.blockedOn === unblocked) {
+      queuedTarget.blockedOn = null;
+    }
+  }
+
+  while (queuedExplicitHydrationTargets.length > 0) {
+    var nextExplicitTarget = queuedExplicitHydrationTargets[0];
+
+    if (nextExplicitTarget.blockedOn !== null) {
+      // We're still blocked.
+      break;
+    } else {
+      attemptExplicitHydrationTarget(nextExplicitTarget);
+
+      if (nextExplicitTarget.blockedOn === null) {
+        // We're unblocked.
+        queuedExplicitHydrationTargets.shift();
+      }
+    }
+  }
+}
+
 var SUPPRESS_HYDRATION_WARNING$1;
 
 {
@@ -10491,6 +9455,1050 @@ function getFiberCurrentPropsFromNode$1(node) {
 }
 function updateFiberProps(node, props) {
   node[internalEventHandlersKey] = props;
+}
+
+var DiscreteEvent = 0;
+var UserBlockingEvent = 1;
+var ContinuousEvent = 2;
+
+var UserBlockingPriority = Scheduler.unstable_UserBlockingPriority,
+  runWithPriority = Scheduler.unstable_runWithPriority;
+var listenToResponderEventTypesImpl;
+function setListenToResponderEventTypes(_listenToResponderEventTypesImpl) {
+  listenToResponderEventTypesImpl = _listenToResponderEventTypesImpl;
+}
+var rootEventTypesToEventResponderInstances = new Map();
+var DoNotPropagateToNextResponder = 0;
+var PropagateToNextResponder = 1;
+var currentTimeStamp = 0;
+var currentInstance = null;
+var currentDocument = null;
+var currentPropagationBehavior = DoNotPropagateToNextResponder;
+var eventResponderContext = {
+  dispatchEvent: function(eventValue, eventListener, eventPriority) {
+    validateResponderContext();
+    validateEventValue(eventValue);
+
+    switch (eventPriority) {
+      case DiscreteEvent: {
+        flushDiscreteUpdatesIfNeeded(currentTimeStamp);
+        discreteUpdates(function() {
+          return executeUserEventHandler(eventListener, eventValue);
+        });
+        break;
+      }
+
+      case UserBlockingEvent: {
+        runWithPriority(UserBlockingPriority, function() {
+          return executeUserEventHandler(eventListener, eventValue);
+        });
+        break;
+      }
+
+      case ContinuousEvent: {
+        executeUserEventHandler(eventListener, eventValue);
+        break;
+      }
+    }
+  },
+  isTargetWithinResponder: function(target) {
+    validateResponderContext();
+
+    if (target != null) {
+      var fiber = getClosestInstanceFromNode(target);
+      var responderFiber = currentInstance.fiber;
+
+      while (fiber !== null) {
+        if (fiber === responderFiber || fiber.alternate === responderFiber) {
+          return true;
+        }
+
+        fiber = fiber.return;
+      }
+    }
+
+    return false;
+  },
+  isTargetWithinResponderScope: function(target) {
+    validateResponderContext();
+    var componentInstance = currentInstance;
+    var responder = componentInstance.responder;
+
+    if (target != null) {
+      var fiber = getClosestInstanceFromNode(target);
+      var responderFiber = currentInstance.fiber;
+
+      while (fiber !== null) {
+        if (fiber === responderFiber || fiber.alternate === responderFiber) {
+          return true;
+        }
+
+        if (doesFiberHaveResponder(fiber, responder)) {
+          return false;
+        }
+
+        fiber = fiber.return;
+      }
+    }
+
+    return false;
+  },
+  isTargetWithinNode: function(childTarget, parentTarget) {
+    validateResponderContext();
+    var childFiber = getClosestInstanceFromNode(childTarget);
+    var parentFiber = getClosestInstanceFromNode(parentTarget);
+
+    if (childFiber != null && parentFiber != null) {
+      var parentAlternateFiber = parentFiber.alternate;
+      var node = childFiber;
+
+      while (node !== null) {
+        if (node === parentFiber || node === parentAlternateFiber) {
+          return true;
+        }
+
+        node = node.return;
+      }
+
+      return false;
+    } // Fallback to DOM APIs
+
+    return parentTarget.contains(childTarget);
+  },
+  addRootEventTypes: function(rootEventTypes) {
+    validateResponderContext();
+    listenToResponderEventTypesImpl(rootEventTypes, currentDocument);
+
+    for (var i = 0; i < rootEventTypes.length; i++) {
+      var rootEventType = rootEventTypes[i];
+      var eventResponderInstance = currentInstance;
+      DEPRECATED_registerRootEventType(rootEventType, eventResponderInstance);
+    }
+  },
+  removeRootEventTypes: function(rootEventTypes) {
+    validateResponderContext();
+
+    for (var i = 0; i < rootEventTypes.length; i++) {
+      var rootEventType = rootEventTypes[i];
+      var rootEventResponders = rootEventTypesToEventResponderInstances.get(
+        rootEventType
+      );
+      var rootEventTypesSet = currentInstance.rootEventTypes;
+
+      if (rootEventTypesSet !== null) {
+        rootEventTypesSet.delete(rootEventType);
+      }
+
+      if (rootEventResponders !== undefined) {
+        rootEventResponders.delete(currentInstance);
+      }
+    }
+  },
+  getActiveDocument: getActiveDocument,
+  objectAssign: Object.assign,
+  getTimeStamp: function() {
+    validateResponderContext();
+    return currentTimeStamp;
+  },
+  isTargetWithinHostComponent: function(target, elementType) {
+    validateResponderContext();
+    var fiber = getClosestInstanceFromNode(target);
+
+    while (fiber !== null) {
+      if (fiber.tag === HostComponent && fiber.type === elementType) {
+        return true;
+      }
+
+      fiber = fiber.return;
+    }
+
+    return false;
+  },
+  continuePropagation: function() {
+    currentPropagationBehavior = PropagateToNextResponder;
+  },
+  enqueueStateRestore: enqueueStateRestore,
+  getResponderNode: function() {
+    validateResponderContext();
+    var responderFiber = currentInstance.fiber;
+
+    if (responderFiber.tag === ScopeComponent) {
+      return null;
+    }
+
+    return responderFiber.stateNode;
+  }
+};
+
+function validateEventValue(eventValue) {
+  if (typeof eventValue === "object" && eventValue !== null) {
+    var target = eventValue.target,
+      type = eventValue.type,
+      timeStamp = eventValue.timeStamp;
+
+    if (target == null || type == null || timeStamp == null) {
+      throw new Error(
+        'context.dispatchEvent: "target", "timeStamp", and "type" fields on event object are required.'
+      );
+    }
+
+    var showWarning = function(name) {
+      {
+        error(
+          "%s is not available on event objects created from event responder modules (React Flare). " +
+            'Try wrapping in a conditional, i.e. `if (event.type !== "press") { event.%s }`',
+          name,
+          name
+        );
+      }
+    };
+
+    eventValue.isDefaultPrevented = function() {
+      {
+        showWarning("isDefaultPrevented()");
+      }
+    };
+
+    eventValue.isPropagationStopped = function() {
+      {
+        showWarning("isPropagationStopped()");
+      }
+    }; // $FlowFixMe: we don't need value, Flow thinks we do
+
+    Object.defineProperty(eventValue, "nativeEvent", {
+      get: function() {
+        {
+          showWarning("nativeEvent");
+        }
+      }
+    });
+  }
+}
+
+function doesFiberHaveResponder(fiber, responder) {
+  var tag = fiber.tag;
+
+  if (tag === HostComponent || tag === ScopeComponent) {
+    var dependencies = fiber.dependencies;
+
+    if (dependencies !== null) {
+      var respondersMap = dependencies.responders;
+
+      if (respondersMap !== null && respondersMap.has(responder)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getActiveDocument() {
+  return currentDocument;
+}
+
+function createDOMResponderEvent(
+  topLevelType,
+  nativeEvent,
+  nativeEventTarget,
+  passive
+) {
+  var _ref = nativeEvent,
+    buttons = _ref.buttons,
+    pointerType = _ref.pointerType;
+  var eventPointerType = "";
+
+  if (pointerType !== undefined) {
+    eventPointerType = pointerType;
+  } else if (nativeEvent.key !== undefined) {
+    eventPointerType = "keyboard";
+  } else if (buttons !== undefined) {
+    eventPointerType = "mouse";
+  } else if (nativeEvent.changedTouches !== undefined) {
+    eventPointerType = "touch";
+  }
+
+  return {
+    nativeEvent: nativeEvent,
+    passive: passive,
+    pointerType: eventPointerType,
+    target: nativeEventTarget,
+    type: topLevelType
+  };
+}
+
+function responderEventTypesContainType(eventTypes, type, isPassive) {
+  for (var i = 0, len = eventTypes.length; i < len; i++) {
+    var eventType = eventTypes[i];
+
+    if (eventType === type || (!isPassive && eventType === type + "_active")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function validateResponderTargetEventTypes(eventType, responder, isPassive) {
+  var targetEventTypes = responder.targetEventTypes; // Validate the target event type exists on the responder
+
+  if (targetEventTypes !== null) {
+    return responderEventTypesContainType(
+      targetEventTypes,
+      eventType,
+      isPassive
+    );
+  }
+
+  return false;
+}
+
+function traverseAndHandleEventResponderInstances(
+  topLevelType,
+  targetFiber,
+  nativeEvent,
+  nativeEventTarget,
+  eventSystemFlags
+) {
+  var isPassiveEvent = (eventSystemFlags & IS_PASSIVE) !== 0;
+  var isPassiveSupported = (eventSystemFlags & PASSIVE_NOT_SUPPORTED) === 0;
+  var isPassive = isPassiveEvent || !isPassiveSupported; // Trigger event responders in this order:
+  // - Bubble target responder phase
+  // - Root responder phase
+
+  var visitedResponders = new Set();
+  var responderEvent = createDOMResponderEvent(
+    topLevelType,
+    nativeEvent,
+    nativeEventTarget,
+    isPassiveEvent
+  );
+  var node = targetFiber;
+  var insidePortal = false;
+
+  while (node !== null) {
+    var _node = node,
+      dependencies = _node.dependencies,
+      tag = _node.tag;
+
+    if (tag === HostPortal) {
+      insidePortal = true;
+    } else if (
+      (tag === HostComponent || tag === ScopeComponent) &&
+      dependencies !== null
+    ) {
+      var respondersMap = dependencies.responders;
+
+      if (respondersMap !== null) {
+        var responderInstances = Array.from(respondersMap.values());
+
+        for (var i = 0, length = responderInstances.length; i < length; i++) {
+          var responderInstance = responderInstances[i];
+          var props = responderInstance.props,
+            responder = responderInstance.responder,
+            state = responderInstance.state;
+
+          if (
+            !visitedResponders.has(responder) &&
+            validateResponderTargetEventTypes(
+              topLevelType,
+              responder,
+              isPassive
+            ) &&
+            (!insidePortal || responder.targetPortalPropagation)
+          ) {
+            visitedResponders.add(responder);
+            var onEvent = responder.onEvent;
+
+            if (onEvent !== null) {
+              currentInstance = responderInstance;
+              onEvent(responderEvent, eventResponderContext, props, state);
+
+              if (currentPropagationBehavior === PropagateToNextResponder) {
+                visitedResponders.delete(responder);
+                currentPropagationBehavior = DoNotPropagateToNextResponder;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    node = node.return;
+  } // Root phase
+
+  var passive = rootEventTypesToEventResponderInstances.get(topLevelType);
+  var rootEventResponderInstances = [];
+
+  if (passive !== undefined) {
+    rootEventResponderInstances.push.apply(
+      rootEventResponderInstances,
+      Array.from(passive)
+    );
+  }
+
+  if (!isPassive) {
+    var active = rootEventTypesToEventResponderInstances.get(
+      topLevelType + "_active"
+    );
+
+    if (active !== undefined) {
+      rootEventResponderInstances.push.apply(
+        rootEventResponderInstances,
+        Array.from(active)
+      );
+    }
+  }
+
+  if (rootEventResponderInstances.length > 0) {
+    var _responderInstances = Array.from(rootEventResponderInstances);
+
+    for (var _i = 0; _i < _responderInstances.length; _i++) {
+      var _responderInstance = _responderInstances[_i];
+      var _props = _responderInstance.props,
+        _responder = _responderInstance.responder,
+        _state = _responderInstance.state;
+      var onRootEvent = _responder.onRootEvent;
+
+      if (onRootEvent !== null) {
+        currentInstance = _responderInstance;
+        onRootEvent(responderEvent, eventResponderContext, _props, _state);
+      }
+    }
+  }
+}
+
+function mountEventResponder(responder, responderInstance, props, state) {
+  var onMount = responder.onMount;
+
+  if (onMount !== null) {
+    var previousInstance = currentInstance;
+    currentInstance = responderInstance;
+
+    try {
+      onMount(eventResponderContext, props, state);
+    } finally {
+      currentInstance = previousInstance;
+    }
+  }
+}
+function unmountEventResponder(responderInstance) {
+  var responder = responderInstance.responder;
+  var onUnmount = responder.onUnmount;
+
+  if (onUnmount !== null) {
+    var props = responderInstance.props,
+      state = responderInstance.state;
+    var previousInstance = currentInstance;
+    currentInstance = responderInstance;
+
+    try {
+      onUnmount(eventResponderContext, props, state);
+    } finally {
+      currentInstance = previousInstance;
+    }
+  }
+
+  var rootEventTypesSet = responderInstance.rootEventTypes;
+
+  if (rootEventTypesSet !== null) {
+    var rootEventTypes = Array.from(rootEventTypesSet);
+
+    for (var i = 0; i < rootEventTypes.length; i++) {
+      var topLevelEventType = rootEventTypes[i];
+      var rootEventResponderInstances = rootEventTypesToEventResponderInstances.get(
+        topLevelEventType
+      );
+
+      if (rootEventResponderInstances !== undefined) {
+        rootEventResponderInstances.delete(responderInstance);
+      }
+    }
+  }
+}
+
+function validateResponderContext() {
+  if (!(currentInstance !== null)) {
+    {
+      throw Error(
+        "An event responder context was used outside of an event cycle."
+      );
+    }
+  }
+}
+
+function DEPRECATED_dispatchEventForResponderEventSystem(
+  topLevelType,
+  targetFiber,
+  nativeEvent,
+  nativeEventTarget,
+  eventSystemFlags
+) {
+  {
+    var previousInstance = currentInstance;
+    var previousTimeStamp = currentTimeStamp;
+    var previousDocument = currentDocument;
+    var previousPropagationBehavior = currentPropagationBehavior;
+    currentPropagationBehavior = DoNotPropagateToNextResponder; // nodeType 9 is DOCUMENT_NODE
+
+    currentDocument =
+      nativeEventTarget.nodeType === 9
+        ? nativeEventTarget
+        : nativeEventTarget.ownerDocument; // We might want to control timeStamp another way here
+
+    currentTimeStamp = nativeEvent.timeStamp;
+
+    try {
+      batchedEventUpdates(function() {
+        traverseAndHandleEventResponderInstances(
+          topLevelType,
+          targetFiber,
+          nativeEvent,
+          nativeEventTarget,
+          eventSystemFlags
+        );
+      });
+    } finally {
+      currentInstance = previousInstance;
+      currentTimeStamp = previousTimeStamp;
+      currentDocument = previousDocument;
+      currentPropagationBehavior = previousPropagationBehavior;
+    }
+  }
+}
+
+function DEPRECATED_registerRootEventType(
+  rootEventType,
+  eventResponderInstance
+) {
+  var rootEventResponderInstances = rootEventTypesToEventResponderInstances.get(
+    rootEventType
+  );
+
+  if (rootEventResponderInstances === undefined) {
+    rootEventResponderInstances = new Set();
+    rootEventTypesToEventResponderInstances.set(
+      rootEventType,
+      rootEventResponderInstances
+    );
+  }
+
+  var rootEventTypesSet = eventResponderInstance.rootEventTypes;
+
+  if (rootEventTypesSet === null) {
+    rootEventTypesSet = eventResponderInstance.rootEventTypes = new Set();
+  }
+
+  if (!!rootEventTypesSet.has(rootEventType)) {
+    {
+      throw Error(
+        'addRootEventTypes() found a duplicate root event type of "' +
+          rootEventType +
+          '". This might be because the event type exists in the event responder "rootEventTypes" array or because of a previous addRootEventTypes() using this root event type.'
+      );
+    }
+  }
+
+  rootEventTypesSet.add(rootEventType);
+  rootEventResponderInstances.add(eventResponderInstance);
+}
+
+var EventListenerWWW = require("EventListener");
+
+function addEventBubbleListener(element, eventType, listener) {
+  EventListenerWWW.listen(element, eventType, listener);
+}
+function addEventCaptureListener(element, eventType, listener) {
+  EventListenerWWW.capture(element, eventType, listener);
+}
+function addEventCaptureListenerWithPassiveFlag(
+  element,
+  eventType,
+  listener,
+  passive
+) {
+  EventListenerWWW.captureWithPassiveFlag(
+    element,
+    eventType,
+    listener,
+    passive
+  );
+} // Flow magic to verify the exports of this file match the original version.
+
+var passiveBrowserEventsSupported = false; // Check if browser support events with passive listeners
+// https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#Safely_detecting_option_support
+
+if (canUseDOM) {
+  try {
+    var options = {}; // $FlowFixMe: Ignore Flow complaining about needing a value
+
+    Object.defineProperty(options, "passive", {
+      get: function() {
+        passiveBrowserEventsSupported = true;
+      }
+    });
+    window.addEventListener("test", options, options);
+    window.removeEventListener("test", options, options);
+  } catch (e) {
+    passiveBrowserEventsSupported = false;
+  }
+}
+
+// do it in two places, which duplicates logic
+// and increases the bundle size, we do it all
+// here once. If we remove or refactor the
+// SimpleEventPlugin, we should also remove or
+// update the below line.
+
+var simpleEventPluginEventTypes = {};
+var topLevelEventsToDispatchConfig = new Map();
+var eventPriorities = new Map(); // We store most of the events in this module in pairs of two strings so we can re-use
+// the code required to apply the same logic for event prioritization and that of the
+// SimpleEventPlugin. This complicates things slightly, but the aim is to reduce code
+// duplication (for which there would be quite a bit). For the events that are not needed
+// for the SimpleEventPlugin (otherDiscreteEvents) we process them separately as an
+// array of top level events.
+// Lastly, we ignore prettier so we can keep the formatting sane.
+// prettier-ignore
+
+var discreteEventPairsForSimpleEventPlugin = [TOP_BLUR, 'blur', TOP_CANCEL, 'cancel', TOP_CLICK, 'click', TOP_CLOSE, 'close', TOP_CONTEXT_MENU, 'contextMenu', TOP_COPY, 'copy', TOP_CUT, 'cut', TOP_AUX_CLICK, 'auxClick', TOP_DOUBLE_CLICK, 'doubleClick', TOP_DRAG_END, 'dragEnd', TOP_DRAG_START, 'dragStart', TOP_DROP, 'drop', TOP_FOCUS, 'focus', TOP_INPUT, 'input', TOP_INVALID, 'invalid', TOP_KEY_DOWN, 'keyDown', TOP_KEY_PRESS, 'keyPress', TOP_KEY_UP, 'keyUp', TOP_MOUSE_DOWN, 'mouseDown', TOP_MOUSE_UP, 'mouseUp', TOP_PASTE, 'paste', TOP_PAUSE, 'pause', TOP_PLAY, 'play', TOP_POINTER_CANCEL, 'pointerCancel', TOP_POINTER_DOWN, 'pointerDown', TOP_POINTER_UP, 'pointerUp', TOP_RATE_CHANGE, 'rateChange', TOP_RESET, 'reset', TOP_SEEKED, 'seeked', TOP_SUBMIT, 'submit', TOP_TOUCH_CANCEL, 'touchCancel', TOP_TOUCH_END, 'touchEnd', TOP_TOUCH_START, 'touchStart', TOP_VOLUME_CHANGE, 'volumeChange'];
+var otherDiscreteEvents = [TOP_CHANGE, TOP_SELECTION_CHANGE, TOP_TEXT_INPUT, TOP_COMPOSITION_START, TOP_COMPOSITION_END, TOP_COMPOSITION_UPDATE]; // prettier-ignore
+
+var userBlockingPairsForSimpleEventPlugin = [TOP_DRAG, 'drag', TOP_DRAG_ENTER, 'dragEnter', TOP_DRAG_EXIT, 'dragExit', TOP_DRAG_LEAVE, 'dragLeave', TOP_DRAG_OVER, 'dragOver', TOP_MOUSE_MOVE, 'mouseMove', TOP_MOUSE_OUT, 'mouseOut', TOP_MOUSE_OVER, 'mouseOver', TOP_POINTER_MOVE, 'pointerMove', TOP_POINTER_OUT, 'pointerOut', TOP_POINTER_OVER, 'pointerOver', TOP_SCROLL, 'scroll', TOP_TOGGLE, 'toggle', TOP_TOUCH_MOVE, 'touchMove', TOP_WHEEL, 'wheel']; // prettier-ignore
+
+var continuousPairsForSimpleEventPlugin = [
+  TOP_ABORT,
+  "abort",
+  TOP_ANIMATION_END,
+  "animationEnd",
+  TOP_ANIMATION_ITERATION,
+  "animationIteration",
+  TOP_ANIMATION_START,
+  "animationStart",
+  TOP_CAN_PLAY,
+  "canPlay",
+  TOP_CAN_PLAY_THROUGH,
+  "canPlayThrough",
+  TOP_DURATION_CHANGE,
+  "durationChange",
+  TOP_EMPTIED,
+  "emptied",
+  TOP_ENCRYPTED,
+  "encrypted",
+  TOP_ENDED,
+  "ended",
+  TOP_ERROR,
+  "error",
+  TOP_GOT_POINTER_CAPTURE,
+  "gotPointerCapture",
+  TOP_LOAD,
+  "load",
+  TOP_LOADED_DATA,
+  "loadedData",
+  TOP_LOADED_METADATA,
+  "loadedMetadata",
+  TOP_LOAD_START,
+  "loadStart",
+  TOP_LOST_POINTER_CAPTURE,
+  "lostPointerCapture",
+  TOP_PLAYING,
+  "playing",
+  TOP_PROGRESS,
+  "progress",
+  TOP_SEEKING,
+  "seeking",
+  TOP_STALLED,
+  "stalled",
+  TOP_SUSPEND,
+  "suspend",
+  TOP_TIME_UPDATE,
+  "timeUpdate",
+  TOP_TRANSITION_END,
+  "transitionEnd",
+  TOP_WAITING,
+  "waiting"
+];
+/**
+ * Turns
+ * ['abort', ...]
+ * into
+ * eventTypes = {
+ *   'abort': {
+ *     phasedRegistrationNames: {
+ *       bubbled: 'onAbort',
+ *       captured: 'onAbortCapture',
+ *     },
+ *     dependencies: [TOP_ABORT],
+ *   },
+ *   ...
+ * };
+ * topLevelEventsToDispatchConfig = new Map([
+ *   [TOP_ABORT, { sameConfig }],
+ * ]);
+ */
+
+function processSimpleEventPluginPairsByPriority(eventTypes, priority) {
+  // As the event types are in pairs of two, we need to iterate
+  // through in twos. The events are in pairs of two to save code
+  // and improve init perf of processing this array, as it will
+  // result in far fewer object allocations and property accesses
+  // if we only use three arrays to process all the categories of
+  // instead of tuples.
+  for (var i = 0; i < eventTypes.length; i += 2) {
+    var topEvent = eventTypes[i];
+    var event = eventTypes[i + 1];
+    var capitalizedEvent = event[0].toUpperCase() + event.slice(1);
+    var onEvent = "on" + capitalizedEvent;
+    var config = {
+      phasedRegistrationNames: {
+        bubbled: onEvent,
+        captured: onEvent + "Capture"
+      },
+      dependencies: [topEvent],
+      eventPriority: priority
+    };
+    eventPriorities.set(topEvent, priority);
+    topLevelEventsToDispatchConfig.set(topEvent, config);
+    simpleEventPluginEventTypes[event] = config;
+  }
+}
+
+function processTopEventPairsByPriority(eventTypes, priority) {
+  for (var i = 0; i < eventTypes.length; i++) {
+    eventPriorities.set(eventTypes[i], priority);
+  }
+} // SimpleEventPlugin
+
+processSimpleEventPluginPairsByPriority(
+  discreteEventPairsForSimpleEventPlugin,
+  DiscreteEvent
+);
+processSimpleEventPluginPairsByPriority(
+  userBlockingPairsForSimpleEventPlugin,
+  UserBlockingEvent
+);
+processSimpleEventPluginPairsByPriority(
+  continuousPairsForSimpleEventPlugin,
+  ContinuousEvent
+); // Not used by SimpleEventPlugin
+
+processTopEventPairsByPriority(otherDiscreteEvents, DiscreteEvent);
+function getEventPriorityForPluginSystem(topLevelType) {
+  var priority = eventPriorities.get(topLevelType); // Default to a ContinuousEvent. Note: we might
+  // want to warn if we can't detect the priority
+  // for the event.
+
+  return priority === undefined ? ContinuousEvent : priority;
+}
+
+// Intentionally not named imports because Rollup would use dynamic dispatch for
+var UserBlockingPriority$1 = Scheduler.unstable_UserBlockingPriority,
+  runWithPriority$1 = Scheduler.unstable_runWithPriority; // TODO: can we stop exporting these?
+
+var _enabled = true;
+function setEnabled(enabled) {
+  _enabled = !!enabled;
+}
+function isEnabled() {
+  return _enabled;
+}
+function trapBubbledEvent(topLevelType, element) {
+  trapEventForPluginEventSystem(element, topLevelType, false);
+}
+function trapCapturedEvent(topLevelType, element) {
+  trapEventForPluginEventSystem(element, topLevelType, true);
+}
+function addResponderEventSystemEvent(document, topLevelType, passive) {
+  var eventFlags = RESPONDER_EVENT_SYSTEM; // If passive option is not supported, then the event will be
+  // active and not passive, but we flag it as using not being
+  // supported too. This way the responder event plugins know,
+  // and can provide polyfills if needed.
+
+  if (passive) {
+    if (passiveBrowserEventsSupported) {
+      eventFlags |= IS_PASSIVE;
+    } else {
+      eventFlags |= IS_ACTIVE;
+      eventFlags |= PASSIVE_NOT_SUPPORTED;
+      passive = false;
+    }
+  } else {
+    eventFlags |= IS_ACTIVE;
+  } // Check if interactive and wrap in discreteUpdates
+
+  var listener = dispatchEvent.bind(null, topLevelType, eventFlags, document);
+
+  if (passiveBrowserEventsSupported) {
+    addEventCaptureListenerWithPassiveFlag(
+      document,
+      topLevelType,
+      listener,
+      passive
+    );
+  } else {
+    addEventCaptureListener(document, topLevelType, listener);
+  }
+
+  return listener;
+}
+function removeActiveResponderEventSystemEvent(
+  document,
+  topLevelType,
+  listener
+) {
+  if (passiveBrowserEventsSupported) {
+    document.removeEventListener(topLevelType, listener, {
+      capture: true,
+      passive: false
+    });
+  } else {
+    document.removeEventListener(topLevelType, listener, true);
+  }
+}
+
+function trapEventForPluginEventSystem(container, topLevelType, capture) {
+  var listener;
+
+  switch (getEventPriorityForPluginSystem(topLevelType)) {
+    case DiscreteEvent:
+      listener = dispatchDiscreteEvent.bind(
+        null,
+        topLevelType,
+        PLUGIN_EVENT_SYSTEM,
+        container
+      );
+      break;
+
+    case UserBlockingEvent:
+      listener = dispatchUserBlockingUpdate.bind(
+        null,
+        topLevelType,
+        PLUGIN_EVENT_SYSTEM,
+        container
+      );
+      break;
+
+    case ContinuousEvent:
+    default:
+      listener = dispatchEvent.bind(
+        null,
+        topLevelType,
+        PLUGIN_EVENT_SYSTEM,
+        container
+      );
+      break;
+  }
+
+  var rawEventName = getRawEventName(topLevelType);
+
+  if (capture) {
+    addEventCaptureListener(container, rawEventName, listener);
+  } else {
+    addEventBubbleListener(container, rawEventName, listener);
+  }
+}
+
+function dispatchDiscreteEvent(
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  flushDiscreteUpdatesIfNeeded(nativeEvent.timeStamp);
+  discreteUpdates(
+    dispatchEvent,
+    topLevelType,
+    eventSystemFlags,
+    container,
+    nativeEvent
+  );
+}
+
+function dispatchUserBlockingUpdate(
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  runWithPriority$1(
+    UserBlockingPriority$1,
+    dispatchEvent.bind(
+      null,
+      topLevelType,
+      eventSystemFlags,
+      container,
+      nativeEvent
+    )
+  );
+}
+
+function dispatchEvent(topLevelType, eventSystemFlags, container, nativeEvent) {
+  if (!_enabled) {
+    return;
+  }
+
+  if (hasQueuedDiscreteEvents() && isReplayableDiscreteEvent(topLevelType)) {
+    // If we already have a queue of discrete events, and this is another discrete
+    // event, then we can't dispatch it regardless of its target, since they
+    // need to dispatch in order.
+    queueDiscreteEvent(
+      null, // Flags that we're not actually blocked on anything as far as we know.
+      topLevelType,
+      eventSystemFlags,
+      container,
+      nativeEvent
+    );
+    return;
+  }
+
+  var blockedOn = attemptToDispatchEvent(
+    topLevelType,
+    eventSystemFlags,
+    container,
+    nativeEvent
+  );
+
+  if (blockedOn === null) {
+    // We successfully dispatched this event.
+    clearIfContinuousEvent(topLevelType, nativeEvent);
+    return;
+  }
+
+  if (isReplayableDiscreteEvent(topLevelType)) {
+    // This this to be replayed later once the target is available.
+    queueDiscreteEvent(
+      blockedOn,
+      topLevelType,
+      eventSystemFlags,
+      container,
+      nativeEvent
+    );
+    return;
+  }
+
+  if (
+    queueIfContinuousEvent(
+      blockedOn,
+      topLevelType,
+      eventSystemFlags,
+      container,
+      nativeEvent
+    )
+  ) {
+    return;
+  } // We need to clear only if we didn't queue because
+  // queueing is accummulative.
+
+  clearIfContinuousEvent(topLevelType, nativeEvent); // This is not replayable so we'll invoke it but without a target,
+  // in case the event system needs to trace it.
+
+  {
+    if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
+      dispatchEventForLegacyPluginEventSystem(
+        topLevelType,
+        eventSystemFlags,
+        nativeEvent,
+        null
+      );
+    }
+
+    if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
+      // React Flare event system
+      DEPRECATED_dispatchEventForResponderEventSystem(
+        topLevelType,
+        null,
+        nativeEvent,
+        getEventTarget(nativeEvent),
+        eventSystemFlags
+      );
+    }
+  }
+} // Attempt dispatching an event. Returns a SuspenseInstance or Container if it's blocked.
+
+function attemptToDispatchEvent(
+  topLevelType,
+  eventSystemFlags,
+  container,
+  nativeEvent
+) {
+  // TODO: Warn if _enabled is false.
+  var nativeEventTarget = getEventTarget(nativeEvent);
+  var targetInst = getClosestInstanceFromNode(nativeEventTarget);
+
+  if (targetInst !== null) {
+    var nearestMounted = getNearestMountedFiber(targetInst);
+
+    if (nearestMounted === null) {
+      // This tree has been unmounted already. Dispatch without a target.
+      targetInst = null;
+    } else {
+      var tag = nearestMounted.tag;
+
+      if (tag === SuspenseComponent) {
+        var instance = getSuspenseInstanceFromFiber(nearestMounted);
+
+        if (instance !== null) {
+          // Queue the event to be replayed later. Abort dispatching since we
+          // don't want this event dispatched twice through the event system.
+          // TODO: If this is the first discrete event in the queue. Schedule an increased
+          // priority for this boundary.
+          return instance;
+        } // This shouldn't happen, something went wrong but to avoid blocking
+        // the whole system, dispatch the event without a target.
+        // TODO: Warn.
+
+        targetInst = null;
+      } else if (tag === HostRoot) {
+        var root = nearestMounted.stateNode;
+
+        if (root.hydrate) {
+          // If this happens during a replay something went wrong and it might block
+          // the whole system.
+          return getContainerFromFiber(nearestMounted);
+        }
+
+        targetInst = null;
+      } else if (nearestMounted !== targetInst) {
+        // If we get an event (ex: img onload) before committing that
+        // component's mount, ignore it for now (that is, treat it as if it was an
+        // event on a non-React tree). We might also consider queueing events and
+        // dispatching them after the mount.
+        targetInst = null;
+      }
+    }
+  }
+
+  {
+    if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
+      dispatchEventForLegacyPluginEventSystem(
+        topLevelType,
+        eventSystemFlags,
+        nativeEvent,
+        targetInst
+      );
+    }
+
+    if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
+      // React Flare event system
+      DEPRECATED_dispatchEventForResponderEventSystem(
+        topLevelType,
+        targetInst,
+        nativeEvent,
+        nativeEventTarget,
+        eventSystemFlags
+      );
+    }
+  } // We're not blocked on anything.
+
+  return null;
+}
+
+if (!React) {
+  {
+    throw Error(
+      "ReactDOM was loaded before React. Make sure you load the React package before loading ReactDOM."
+    );
+  }
 }
 
 function getParent(inst) {
@@ -30578,6 +30586,7 @@ function unmountComponentAtNode(container) {
         container,
         false,
         function() {
+          // $FlowFixMe This should probably use `delete container._reactRootContainer`
           container._reactRootContainer = null;
           unmarkContainerAsRoot(container);
         }
@@ -30673,84 +30682,70 @@ function createPortal$1(children, container) {
       throw Error("Target container is not a DOM element.");
     }
   } // TODO: pass ReactDOM portal implementation as third argument
+  // $FlowFixMe The Flow type is opaque but there's no way to actually create it.
 
   return createPortal(children, container, null, key);
 }
 
-var ReactDOM = {
-  createPortal: createPortal$1,
-  unstable_batchedUpdates: batchedUpdates$1,
-  flushSync: flushSync,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    // Keep in sync with ReactDOMUnstableNativeDependencies.js
-    // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
-    Events: [
-      getInstanceFromNode$2,
-      getNodeFromInstance$1,
-      getFiberCurrentPropsFromNode$1,
-      injectEventPluginsByName,
-      eventNameDispatchConfigs,
-      accumulateTwoPhaseDispatches,
-      accumulateDirectDispatches,
-      enqueueStateRestore,
-      restoreStateIfNeeded,
-      dispatchEvent,
-      runEventsInBatch,
-      flushPassiveEffects,
-      IsThisRendererActing
-    ]
-  },
-  version: ReactVersion
+function scheduleHydration(target) {
+  if (target) {
+    queueExplicitHydrationTarget(target);
+  }
+}
+
+function renderSubtreeIntoContainer(
+  parentComponent,
+  element,
+  containerNode,
+  callback
+) {
+  return unstable_renderSubtreeIntoContainer(
+    parentComponent,
+    element,
+    containerNode,
+    callback
+  );
+}
+
+function unstable_createPortal(children, container) {
+  var key =
+    arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+
+  {
+    if (!didWarnAboutUnstableCreatePortal) {
+      didWarnAboutUnstableCreatePortal = true;
+
+      warn(
+        "The ReactDOM.unstable_createPortal() alias has been deprecated, " +
+          "and will be removed in React 17+. Update your code to use " +
+          "ReactDOM.createPortal() instead. It has the exact same API, " +
+          'but without the "unstable_" prefix.'
+      );
+    }
+  }
+
+  return createPortal$1(children, container, key);
+}
+
+var Internals = {
+  // Keep in sync with ReactDOMUnstableNativeDependencies.js
+  // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
+  Events: [
+    getInstanceFromNode$2,
+    getNodeFromInstance$1,
+    getFiberCurrentPropsFromNode$1,
+    injectEventPluginsByName,
+    eventNameDispatchConfigs,
+    accumulateTwoPhaseDispatches,
+    accumulateDirectDispatches,
+    enqueueStateRestore,
+    restoreStateIfNeeded,
+    dispatchEvent,
+    runEventsInBatch,
+    flushPassiveEffects,
+    IsThisRendererActing
+  ]
 };
-
-{
-  ReactDOM.findDOMNode = findDOMNode;
-  ReactDOM.hydrate = hydrate;
-  ReactDOM.render = render;
-  ReactDOM.unmountComponentAtNode = unmountComponentAtNode;
-}
-
-{
-  ReactDOM.createRoot = createRoot;
-  ReactDOM.createBlockingRoot = createBlockingRoot;
-  ReactDOM.unstable_discreteUpdates = discreteUpdates$1;
-  ReactDOM.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
-  ReactDOM.unstable_flushControlled = flushControlled;
-
-  ReactDOM.unstable_scheduleHydration = function(target) {
-    if (target) {
-      queueExplicitHydrationTarget(target);
-    }
-  };
-}
-
-{
-  ReactDOM.unstable_renderSubtreeIntoContainer = function() {
-    return unstable_renderSubtreeIntoContainer.apply(void 0, arguments);
-  };
-}
-
-{
-  // Temporary alias since we already shipped React 16 RC with it.
-  // TODO: remove in React 17.
-  ReactDOM.unstable_createPortal = function() {
-    {
-      if (!didWarnAboutUnstableCreatePortal) {
-        didWarnAboutUnstableCreatePortal = true;
-
-        warn(
-          "The ReactDOM.unstable_createPortal() alias has been deprecated, " +
-            "and will be removed in React 17+. Update your code to use " +
-            "ReactDOM.createPortal() instead. It has the exact same API, " +
-            'but without the "unstable_" prefix.'
-        );
-      }
-    }
-
-    return createPortal$1.apply(void 0, arguments);
-  };
-}
-
 var foundDevTools = injectIntoDevTools({
   findFiberByHostInstance: getClosestInstanceFromNode,
   bundleType: 1,
@@ -30785,27 +30780,35 @@ var foundDevTools = injectIntoDevTools({
   }
 }
 
-{
-  ReactDOM.act = act;
-}
-
-var ReactDOM$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: ReactDOM
+Object.assign(Internals, {
+  ReactBrowserEventEmitter: {
+    isEnabled: isEnabled
+  },
+  ReactDOMComponentTree: {
+    getClosestInstanceFromNode: getClosestInstanceFromNode
+  },
+  // Perf experiment
+  addUserTimingListener: addUserTimingListener
 });
 
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var ReactDOM$2 = getCjsExportFromNamespace(ReactDOM$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var testing = ReactDOM$2.default || ReactDOM$2;
-
-module.exports = testing;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+exports.act = act;
+exports.createBlockingRoot = createBlockingRoot;
+exports.createPortal = createPortal$1;
+exports.createRoot = createRoot;
+exports.findDOMNode = findDOMNode;
+exports.flushSync = flushSync;
+exports.hydrate = hydrate;
+exports.render = render;
+exports.unmountComponentAtNode = unmountComponentAtNode;
+exports.unstable_batchedUpdates = batchedUpdates$1;
+exports.unstable_createPortal = unstable_createPortal;
+exports.unstable_discreteUpdates = discreteUpdates$1;
+exports.unstable_flushControlled = flushControlled;
+exports.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
+exports.unstable_renderSubtreeIntoContainer = renderSubtreeIntoContainer;
+exports.unstable_scheduleHydration = scheduleHydration;
+exports.version = ReactVersion;
 
   })();
 }

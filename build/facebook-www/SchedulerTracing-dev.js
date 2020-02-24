@@ -15,8 +15,6 @@ if (__DEV__) {
   (function() {
 "use strict";
 
-Object.defineProperty(exports, "__esModule", { value: true });
-
 // Re-export dynamic flags from the www version.
 var _require = require("ReactFeatureFlags"),
   debugRenderPhaseSideEffectsForStrictMode =

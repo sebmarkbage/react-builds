@@ -15,8 +15,6 @@ if (__DEV__) {
   (function() {
 "use strict";
 
-Object.defineProperty(exports, "__esModule", { value: true });
-
 var React = require("react");
 var Scheduler = require("scheduler");
 

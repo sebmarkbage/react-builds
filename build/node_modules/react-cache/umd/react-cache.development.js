@@ -334,6 +334,4 @@
   exports.unstable_createResource = unstable_createResource;
   exports.unstable_setGlobalCacheLimit = unstable_setGlobalCacheLimit;
 
-  Object.defineProperty(exports, '__esModule', { value: true });
-
 })));

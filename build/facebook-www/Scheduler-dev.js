@@ -15,8 +15,6 @@ if (__DEV__) {
   (function() {
 "use strict";
 
-Object.defineProperty(exports, "__esModule", { value: true });
-
 var _require = require("SchedulerFeatureFlags"),
   enableIsInputPending = _require.enableIsInputPending,
   enableSchedulerDebugging = _require.enableSchedulerDebugging,

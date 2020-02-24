@@ -15,8 +15,6 @@ if (__DEV__) {
   (function() {
 "use strict";
 
-Object.defineProperty(exports, "__esModule", { value: true });
-
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
 // nor polyfill, then a plain number is used for performance.
 var hasSymbol = typeof Symbol === "function" && Symbol.for;

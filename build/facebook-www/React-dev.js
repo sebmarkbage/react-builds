@@ -2495,94 +2495,61 @@ function createScope() {
   return scopeComponent;
 }
 
-var React = {
-  Children: {
-    map: mapChildren,
-    forEach: forEachChildren,
-    count: countChildren,
-    toArray: toArray,
-    only: onlyChild
-  },
-  createRef: createRef,
-  Component: Component,
-  PureComponent: PureComponent,
-  createContext: createContext,
-  forwardRef: forwardRef,
-  lazy: lazy,
-  memo: memo,
-  useCallback: useCallback,
-  useContext: useContext,
-  useEffect: useEffect,
-  useImperativeHandle: useImperativeHandle,
-  useDebugValue: useDebugValue,
-  useLayoutEffect: useLayoutEffect,
-  useMemo: useMemo,
-  useReducer: useReducer,
-  useRef: useRef,
-  useState: useState,
-  Fragment: REACT_FRAGMENT_TYPE,
-  Profiler: REACT_PROFILER_TYPE,
-  StrictMode: REACT_STRICT_MODE_TYPE,
-  Suspense: REACT_SUSPENSE_TYPE,
-  createElement: createElementWithValidation,
-  cloneElement: cloneElementWithValidation,
-  isValidElement: isValidElement,
-  version: ReactVersion,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: ReactSharedInternals
+var createElement$1 = createElementWithValidation;
+var cloneElement$1 = cloneElementWithValidation;
+var createFactory = createFactoryWithValidation;
+var jsxDEV$1 = jsxWithValidation;
+var jsx = jsxWithValidationDynamic; // we may want to special case jsxs internally to take advantage of static children.
+// for now we can ship identical prod functions
+
+var jsxs = jsxWithValidationStatic;
+var Children = {
+  map: mapChildren,
+  forEach: forEachChildren,
+  count: countChildren,
+  toArray: toArray,
+  only: onlyChild
 };
 
-{
-  React.createFactory = createFactoryWithValidation;
-}
-
-{
-  React.useTransition = useTransition;
-  React.useDeferredValue = useDeferredValue;
-  React.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
-  React.unstable_withSuspenseConfig = withSuspenseConfig;
-}
-
-{
-  React.block = block;
-}
-
-{
-  React.DEPRECATED_useResponder = useResponder;
-  React.DEPRECATED_createResponder = createEventResponder;
-}
-
-{
-  React.unstable_createScope = createScope;
-} // Note: some APIs are added with feature flags.
-// Make sure that stable builds for open source
-// don't modify the React object to avoid deopts.
-// Also let's not expose their names in stable builds.
-
-{
-  {
-    React.jsxDEV = jsxWithValidation;
-    React.jsx = jsxWithValidationDynamic;
-    React.jsxs = jsxWithValidationStatic;
-  }
-}
-
-var React$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: React
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var React$2 = getCjsExportFromNamespace(React$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var react = React$2.default || React$2;
-
-module.exports = react;
+exports.Children = Children;
+exports.Component = Component;
+exports.DEPRECATED_createResponder = createEventResponder;
+exports.DEPRECATED_useResponder = useResponder;
+exports.Fragment = REACT_FRAGMENT_TYPE;
+exports.Profiler = REACT_PROFILER_TYPE;
+exports.PureComponent = PureComponent;
+exports.StrictMode = REACT_STRICT_MODE_TYPE;
+exports.Suspense = REACT_SUSPENSE_TYPE;
+exports.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactSharedInternals;
+exports.block = block;
+exports.cloneElement = cloneElement$1;
+exports.createContext = createContext;
+exports.createElement = createElement$1;
+exports.createFactory = createFactory;
+exports.createRef = createRef;
+exports.forwardRef = forwardRef;
+exports.isValidElement = isValidElement;
+exports.jsx = jsx;
+exports.jsxDEV = jsxDEV$1;
+exports.jsxs = jsxs;
+exports.lazy = lazy;
+exports.memo = memo;
+exports.unstable_createScope = createScope;
+exports.unstable_withSuspenseConfig = withSuspenseConfig;
+exports.useCallback = useCallback;
+exports.useContext = useContext;
+exports.useDebugValue = useDebugValue;
+exports.useDeferredValue = useDeferredValue;
+exports.useEffect = useEffect;
+exports.useImperativeHandle = useImperativeHandle;
+exports.useLayoutEffect = useLayoutEffect;
+exports.useMemo = useMemo;
+exports.useReducer = useReducer;
+exports.useRef = useRef;
+exports.useState = useState;
+exports.useTransition = useTransition;
+exports.version = ReactVersion;
 
   })();
 }
