@@ -10,7 +10,6 @@
  */
 
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: !0 });
 var hasSymbol = "function" === typeof Symbol && Symbol.for,
   REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 60103,
   REACT_PORTAL_TYPE = hasSymbol ? Symbol.for("react.portal") : 60106,

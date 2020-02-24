@@ -178,6 +178,4 @@
   exports.isValidElementType = isValidElementType;
   exports.typeOf = typeOf;
 
-  Object.defineProperty(exports, '__esModule', { value: true });
-
 })));

@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global.React = factory());
-}(this, (function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = global || self, factory(global.React = {}));
+}(this, (function (exports) { 'use strict';
 
   var ReactVersion = '16.12.0';
 
@@ -3329,63 +3329,49 @@
     }
   }
 
-  var React = {
-    Children: {
-      map: mapChildren,
-      forEach: forEachChildren,
-      count: countChildren,
-      toArray: toArray,
-      only: onlyChild
-    },
-    createRef: createRef,
-    Component: Component,
-    PureComponent: PureComponent,
-    createContext: createContext,
-    forwardRef: forwardRef,
-    lazy: lazy,
-    memo: memo,
-    useCallback: useCallback,
-    useContext: useContext,
-    useEffect: useEffect,
-    useImperativeHandle: useImperativeHandle,
-    useDebugValue: useDebugValue,
-    useLayoutEffect: useLayoutEffect,
-    useMemo: useMemo,
-    useReducer: useReducer,
-    useRef: useRef,
-    useState: useState,
-    Fragment: REACT_FRAGMENT_TYPE,
-    Profiler: REACT_PROFILER_TYPE,
-    StrictMode: REACT_STRICT_MODE_TYPE,
-    Suspense: REACT_SUSPENSE_TYPE,
-    createElement:  createElementWithValidation ,
-    cloneElement:  cloneElementWithValidation ,
-    isValidElement: isValidElement,
-    version: ReactVersion,
-    __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: ReactSharedInternals$1
+  var createElement$1 =  createElementWithValidation ;
+  var cloneElement$1 =  cloneElementWithValidation ;
+  var createFactory =  createFactoryWithValidation ;
+  var Children = {
+    map: mapChildren,
+    forEach: forEachChildren,
+    count: countChildren,
+    toArray: toArray,
+    only: onlyChild
   };
 
-  {
-    React.createFactory =  createFactoryWithValidation ;
-  }
-
-  {
-    React.useTransition = useTransition;
-    React.useDeferredValue = useDeferredValue;
-    React.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
-    React.unstable_withSuspenseConfig = withSuspenseConfig;
-  }
-
-  {
-    React.block = block;
-  }
-
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest.
-
-
-  var react = React.default || React;
-
-  return react;
+  exports.Children = Children;
+  exports.Component = Component;
+  exports.Fragment = REACT_FRAGMENT_TYPE;
+  exports.Profiler = REACT_PROFILER_TYPE;
+  exports.PureComponent = PureComponent;
+  exports.StrictMode = REACT_STRICT_MODE_TYPE;
+  exports.Suspense = REACT_SUSPENSE_TYPE;
+  exports.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
+  exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactSharedInternals$1;
+  exports.block = block;
+  exports.cloneElement = cloneElement$1;
+  exports.createContext = createContext;
+  exports.createElement = createElement$1;
+  exports.createFactory = createFactory;
+  exports.createRef = createRef;
+  exports.forwardRef = forwardRef;
+  exports.isValidElement = isValidElement;
+  exports.lazy = lazy;
+  exports.memo = memo;
+  exports.unstable_withSuspenseConfig = withSuspenseConfig;
+  exports.useCallback = useCallback;
+  exports.useContext = useContext;
+  exports.useDebugValue = useDebugValue;
+  exports.useDeferredValue = useDeferredValue;
+  exports.useEffect = useEffect;
+  exports.useImperativeHandle = useImperativeHandle;
+  exports.useLayoutEffect = useLayoutEffect;
+  exports.useMemo = useMemo;
+  exports.useReducer = useReducer;
+  exports.useRef = useRef;
+  exports.useState = useState;
+  exports.useTransition = useTransition;
+  exports.version = ReactVersion;
 
 })));

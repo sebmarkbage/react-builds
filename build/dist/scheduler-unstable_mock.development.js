@@ -854,6 +854,4 @@
   exports.unstable_wrapCallback = unstable_wrapCallback;
   exports.unstable_yieldValue = unstable_yieldValue;
 
-  Object.defineProperty(exports, '__esModule', { value: true });
-
 })));

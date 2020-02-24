@@ -29817,50 +29817,36 @@ function createPortal$1(children, container) {
       throw Error("Target container is not a DOM element.");
     }
   } // TODO: pass ReactDOM portal implementation as third argument
+  // $FlowFixMe The Flow type is opaque but there's no way to actually create it.
 
   return createPortal(children, container, null, key);
 }
 
-var ReactDOM = {
-  createPortal: createPortal$1,
-  unstable_batchedUpdates: batchedUpdates$1,
-  flushSync: flushSync,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    // Keep in sync with ReactDOMUnstableNativeDependencies.js
-    // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
-    Events: [
-      getInstanceFromNode$2,
-      getNodeFromInstance$1,
-      getFiberCurrentPropsFromNode$1,
-      injectEventPluginsByName,
-      eventNameDispatchConfigs,
-      accumulateTwoPhaseDispatches,
-      accumulateDirectDispatches,
-      enqueueStateRestore,
-      restoreStateIfNeeded,
-      dispatchEvent,
-      runEventsInBatch,
-      flushPassiveEffects,
-      IsThisRendererActing
-    ]
-  },
-  version: ReactVersion
-};
-
-{
-  ReactDOM.createRoot = createRoot;
-  ReactDOM.createBlockingRoot = createBlockingRoot;
-  ReactDOM.unstable_discreteUpdates = discreteUpdates$1;
-  ReactDOM.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
-  ReactDOM.unstable_flushControlled = flushControlled;
-
-  ReactDOM.unstable_scheduleHydration = function(target) {
-    if (target) {
-      queueExplicitHydrationTarget(target);
-    }
-  };
+function scheduleHydration(target) {
+  if (target) {
+    queueExplicitHydrationTarget(target);
+  }
 }
 
+var Internals = {
+  // Keep in sync with ReactDOMUnstableNativeDependencies.js
+  // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
+  Events: [
+    getInstanceFromNode$2,
+    getNodeFromInstance$1,
+    getFiberCurrentPropsFromNode$1,
+    injectEventPluginsByName,
+    eventNameDispatchConfigs,
+    accumulateTwoPhaseDispatches,
+    accumulateDirectDispatches,
+    enqueueStateRestore,
+    restoreStateIfNeeded,
+    dispatchEvent,
+    runEventsInBatch,
+    flushPassiveEffects,
+    IsThisRendererActing
+  ]
+};
 var foundDevTools = injectIntoDevTools({
   findFiberByHostInstance: getClosestInstanceFromNode,
   bundleType: 1,
@@ -29895,27 +29881,18 @@ var foundDevTools = injectIntoDevTools({
   }
 }
 
-{
-  ReactDOM.act = act;
-}
-
-var ReactDOM$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: ReactDOM
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var ReactDOM$2 = getCjsExportFromNamespace(ReactDOM$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var testing = ReactDOM$2.default || ReactDOM$2;
-
-module.exports = testing;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+exports.act = act;
+exports.createBlockingRoot = createBlockingRoot;
+exports.createPortal = createPortal$1;
+exports.createRoot = createRoot;
+exports.flushSync = flushSync;
+exports.unstable_batchedUpdates = batchedUpdates$1;
+exports.unstable_discreteUpdates = discreteUpdates$1;
+exports.unstable_flushControlled = flushControlled;
+exports.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
+exports.unstable_scheduleHydration = scheduleHydration;
+exports.version = ReactVersion;
 
   })();
 }

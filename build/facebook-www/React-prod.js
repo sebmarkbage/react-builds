@@ -323,236 +323,54 @@ function resolveDispatcher() {
 }
 var emptyObject$1 = {},
   ReactCurrentBatchConfig = { suspense: null },
-  React = {
-    Children: {
-      map: function(children, func, context) {
-        if (null == children) return children;
-        var result = [];
-        mapIntoWithKeyPrefixInternal(children, result, null, func, context);
-        return result;
-      },
-      forEach: function(children, forEachFunc, forEachContext) {
-        if (null == children) return children;
-        forEachFunc = getPooledTraverseContext(
-          null,
-          null,
-          forEachFunc,
-          forEachContext
-        );
-        traverseAllChildren(children, forEachSingleChild, forEachFunc);
-        releaseTraverseContext(forEachFunc);
-      },
-      count: function(children) {
-        return traverseAllChildren(
-          children,
-          function() {
-            return null;
-          },
-          null
-        );
-      },
-      toArray: function(children) {
-        var result = [];
-        mapIntoWithKeyPrefixInternal(children, result, null, function(child) {
-          return child;
-        });
-        return result;
-      },
-      only: function(children) {
-        if (!isValidElement(children)) throw Error(formatProdErrorMessage(143));
-        return children;
-      }
-    },
-    createRef: function() {
-      return { current: null };
-    },
-    Component: Component,
-    PureComponent: PureComponent,
-    createContext: function(defaultValue, calculateChangedBits) {
-      void 0 === calculateChangedBits && (calculateChangedBits = null);
-      defaultValue = {
-        $$typeof: REACT_CONTEXT_TYPE,
-        _calculateChangedBits: calculateChangedBits,
-        _currentValue: defaultValue,
-        _currentValue2: defaultValue,
-        _threadCount: 0,
-        Provider: null,
-        Consumer: null
-      };
-      defaultValue.Provider = {
-        $$typeof: REACT_PROVIDER_TYPE,
-        _context: defaultValue
-      };
-      return (defaultValue.Consumer = defaultValue);
-    },
-    forwardRef: function(render) {
-      return { $$typeof: REACT_FORWARD_REF_TYPE, render: render };
-    },
-    lazy: function(ctor) {
-      return {
-        $$typeof: REACT_LAZY_TYPE,
-        _ctor: ctor,
-        _status: -1,
-        _result: null
-      };
-    },
-    memo: function(type, compare) {
-      return {
-        $$typeof: REACT_MEMO_TYPE,
-        type: type,
-        compare: void 0 === compare ? null : compare
-      };
-    },
-    useCallback: function(callback, deps) {
-      return resolveDispatcher().useCallback(callback, deps);
-    },
-    useContext: function(Context, unstable_observedBits) {
-      return resolveDispatcher().useContext(Context, unstable_observedBits);
-    },
-    useEffect: function(create, deps) {
-      return resolveDispatcher().useEffect(create, deps);
-    },
-    useImperativeHandle: function(ref, create, deps) {
-      return resolveDispatcher().useImperativeHandle(ref, create, deps);
-    },
-    useDebugValue: function() {},
-    useLayoutEffect: function(create, deps) {
-      return resolveDispatcher().useLayoutEffect(create, deps);
-    },
-    useMemo: function(create, deps) {
-      return resolveDispatcher().useMemo(create, deps);
-    },
-    useReducer: function(reducer, initialArg, init) {
-      return resolveDispatcher().useReducer(reducer, initialArg, init);
-    },
-    useRef: function(initialValue) {
-      return resolveDispatcher().useRef(initialValue);
-    },
-    useState: function(initialState) {
-      return resolveDispatcher().useState(initialState);
-    },
-    Fragment: REACT_FRAGMENT_TYPE,
-    Profiler: REACT_PROFILER_TYPE,
-    StrictMode: REACT_STRICT_MODE_TYPE,
-    Suspense: REACT_SUSPENSE_TYPE,
-    createElement: function(type, config, children) {
-      var propName,
-        props = {},
-        key = null,
-        ref = null,
-        self = null,
-        source = null;
-      if (null != config)
-        for (propName in (void 0 !== config.ref && (ref = config.ref),
-        void 0 !== config.key && (key = "" + config.key),
-        (self = void 0 === config.__self ? null : config.__self),
-        (source = void 0 === config.__source ? null : config.__source),
-        config))
-          hasOwnProperty.call(config, propName) &&
-            !RESERVED_PROPS.hasOwnProperty(propName) &&
-            (props[propName] = config[propName]);
-      var childrenLength = arguments.length - 2;
-      if (1 === childrenLength) props.children = children;
-      else if (1 < childrenLength) {
-        for (
-          var childArray = Array(childrenLength), i = 0;
-          i < childrenLength;
-          i++
-        )
-          childArray[i] = arguments[i + 2];
-        props.children = childArray;
-      }
-      if (type && type.defaultProps)
-        for (propName in ((childrenLength = type.defaultProps), childrenLength))
-          void 0 === props[propName] &&
-            (props[propName] = childrenLength[propName]);
-      return ReactElement(
-        type,
-        key,
-        ref,
-        self,
-        source,
-        ReactCurrentOwner.current,
-        props
-      );
-    },
-    cloneElement: function(element, config, children) {
-      if (null === element || void 0 === element)
-        throw Error(formatProdErrorMessage(267, element));
-      var props = Object.assign({}, element.props),
-        key = element.key,
-        ref = element.ref,
-        self = element._self,
-        source = element._source,
-        owner = element._owner;
-      if (null != config) {
-        void 0 !== config.ref &&
-          ((ref = config.ref), (owner = ReactCurrentOwner.current));
-        void 0 !== config.key && (key = "" + config.key);
-        if (element.type && element.type.defaultProps)
-          var defaultProps = element.type.defaultProps;
-        for (propName in config)
-          hasOwnProperty.call(config, propName) &&
-            !RESERVED_PROPS.hasOwnProperty(propName) &&
-            (props[propName] =
-              void 0 === config[propName] && void 0 !== defaultProps
-                ? defaultProps[propName]
-                : config[propName]);
-      }
-      var propName = arguments.length - 2;
-      if (1 === propName) props.children = children;
-      else if (1 < propName) {
-        defaultProps = Array(propName);
-        for (var i = 0; i < propName; i++) defaultProps[i] = arguments[i + 2];
-        props.children = defaultProps;
-      }
-      return ReactElement(element.type, key, ref, self, source, owner, props);
-    },
-    isValidElement: isValidElement,
-    version: "16.12.0",
-    __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-      ReactCurrentDispatcher: ReactCurrentDispatcher,
-      ReactCurrentBatchConfig: ReactCurrentBatchConfig,
-      ReactCurrentOwner: ReactCurrentOwner,
-      IsSomeRendererActing: { current: !1 },
-      assign: assign
-    },
-    useTransition: function(config) {
-      return resolveDispatcher().useTransition(config);
-    },
-    useDeferredValue: function(value, config) {
-      return resolveDispatcher().useDeferredValue(value, config);
-    }
+  ReactSharedInternals = {
+    ReactCurrentDispatcher: ReactCurrentDispatcher,
+    ReactCurrentBatchConfig: ReactCurrentBatchConfig,
+    ReactCurrentOwner: ReactCurrentOwner,
+    IsSomeRendererActing: { current: !1 },
+    assign: assign
   };
-React.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
-React.unstable_withSuspenseConfig = function(scope, config) {
-  var previousConfig = ReactCurrentBatchConfig.suspense;
-  ReactCurrentBatchConfig.suspense = void 0 === config ? null : config;
-  try {
-    scope();
-  } finally {
-    ReactCurrentBatchConfig.suspense = previousConfig;
+exports.Children = {
+  map: function(children, func, context) {
+    if (null == children) return children;
+    var result = [];
+    mapIntoWithKeyPrefixInternal(children, result, null, func, context);
+    return result;
+  },
+  forEach: function(children, forEachFunc, forEachContext) {
+    if (null == children) return children;
+    forEachFunc = getPooledTraverseContext(
+      null,
+      null,
+      forEachFunc,
+      forEachContext
+    );
+    traverseAllChildren(children, forEachSingleChild, forEachFunc);
+    releaseTraverseContext(forEachFunc);
+  },
+  count: function(children) {
+    return traverseAllChildren(
+      children,
+      function() {
+        return null;
+      },
+      null
+    );
+  },
+  toArray: function(children) {
+    var result = [];
+    mapIntoWithKeyPrefixInternal(children, result, null, function(child) {
+      return child;
+    });
+    return result;
+  },
+  only: function(children) {
+    if (!isValidElement(children)) throw Error(formatProdErrorMessage(143));
+    return children;
   }
 };
-React.block = function(query, render) {
-  return function() {
-    var args = arguments;
-    return {
-      $$typeof: REACT_BLOCK_TYPE,
-      query: function() {
-        return query.apply(null, args);
-      },
-      render: render
-    };
-  };
-};
-React.DEPRECATED_useResponder = function(responder, listenerProps) {
-  return resolveDispatcher().useResponder(
-    responder,
-    listenerProps || emptyObject$1
-  );
-};
-React.DEPRECATED_createResponder = function(displayName, responderConfig) {
+exports.Component = Component;
+exports.DEPRECATED_createResponder = function(displayName, responderConfig) {
   return {
     $$typeof: REACT_RESPONDER_TYPE,
     displayName: displayName,
@@ -566,11 +384,181 @@ React.DEPRECATED_createResponder = function(displayName, responderConfig) {
     targetPortalPropagation: responderConfig.targetPortalPropagation || !1
   };
 };
-React.unstable_createScope = function() {
+exports.DEPRECATED_useResponder = function(responder, listenerProps) {
+  return resolveDispatcher().useResponder(
+    responder,
+    listenerProps || emptyObject$1
+  );
+};
+exports.Fragment = REACT_FRAGMENT_TYPE;
+exports.Profiler = REACT_PROFILER_TYPE;
+exports.PureComponent = PureComponent;
+exports.StrictMode = REACT_STRICT_MODE_TYPE;
+exports.Suspense = REACT_SUSPENSE_TYPE;
+exports.SuspenseList = REACT_SUSPENSE_LIST_TYPE;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactSharedInternals;
+exports.block = function(query, render) {
+  return function() {
+    var args = arguments;
+    return {
+      $$typeof: REACT_BLOCK_TYPE,
+      query: function() {
+        return query.apply(null, args);
+      },
+      render: render
+    };
+  };
+};
+exports.cloneElement = function(element, config, children) {
+  if (null === element || void 0 === element)
+    throw Error(formatProdErrorMessage(267, element));
+  var props = Object.assign({}, element.props),
+    key = element.key,
+    ref = element.ref,
+    self = element._self,
+    source = element._source,
+    owner = element._owner;
+  if (null != config) {
+    void 0 !== config.ref &&
+      ((ref = config.ref), (owner = ReactCurrentOwner.current));
+    void 0 !== config.key && (key = "" + config.key);
+    if (element.type && element.type.defaultProps)
+      var defaultProps = element.type.defaultProps;
+    for (propName in config)
+      hasOwnProperty.call(config, propName) &&
+        !RESERVED_PROPS.hasOwnProperty(propName) &&
+        (props[propName] =
+          void 0 === config[propName] && void 0 !== defaultProps
+            ? defaultProps[propName]
+            : config[propName]);
+  }
+  var propName = arguments.length - 2;
+  if (1 === propName) props.children = children;
+  else if (1 < propName) {
+    defaultProps = Array(propName);
+    for (var i = 0; i < propName; i++) defaultProps[i] = arguments[i + 2];
+    props.children = defaultProps;
+  }
+  return ReactElement(element.type, key, ref, self, source, owner, props);
+};
+exports.createContext = function(defaultValue, calculateChangedBits) {
+  void 0 === calculateChangedBits && (calculateChangedBits = null);
+  defaultValue = {
+    $$typeof: REACT_CONTEXT_TYPE,
+    _calculateChangedBits: calculateChangedBits,
+    _currentValue: defaultValue,
+    _currentValue2: defaultValue,
+    _threadCount: 0,
+    Provider: null,
+    Consumer: null
+  };
+  defaultValue.Provider = {
+    $$typeof: REACT_PROVIDER_TYPE,
+    _context: defaultValue
+  };
+  return (defaultValue.Consumer = defaultValue);
+};
+exports.createElement = function(type, config, children) {
+  var propName,
+    props = {},
+    key = null,
+    ref = null,
+    self = null,
+    source = null;
+  if (null != config)
+    for (propName in (void 0 !== config.ref && (ref = config.ref),
+    void 0 !== config.key && (key = "" + config.key),
+    (self = void 0 === config.__self ? null : config.__self),
+    (source = void 0 === config.__source ? null : config.__source),
+    config))
+      hasOwnProperty.call(config, propName) &&
+        !RESERVED_PROPS.hasOwnProperty(propName) &&
+        (props[propName] = config[propName]);
+  var childrenLength = arguments.length - 2;
+  if (1 === childrenLength) props.children = children;
+  else if (1 < childrenLength) {
+    for (var childArray = Array(childrenLength), i = 0; i < childrenLength; i++)
+      childArray[i] = arguments[i + 2];
+    props.children = childArray;
+  }
+  if (type && type.defaultProps)
+    for (propName in ((childrenLength = type.defaultProps), childrenLength))
+      void 0 === props[propName] &&
+        (props[propName] = childrenLength[propName]);
+  return ReactElement(
+    type,
+    key,
+    ref,
+    self,
+    source,
+    ReactCurrentOwner.current,
+    props
+  );
+};
+exports.createRef = function() {
+  return { current: null };
+};
+exports.forwardRef = function(render) {
+  return { $$typeof: REACT_FORWARD_REF_TYPE, render: render };
+};
+exports.isValidElement = isValidElement;
+exports.jsx = jsx;
+exports.jsxDEV = void 0;
+exports.jsxs = jsx;
+exports.lazy = function(ctor) {
+  return { $$typeof: REACT_LAZY_TYPE, _ctor: ctor, _status: -1, _result: null };
+};
+exports.memo = function(type, compare) {
+  return {
+    $$typeof: REACT_MEMO_TYPE,
+    type: type,
+    compare: void 0 === compare ? null : compare
+  };
+};
+exports.unstable_createScope = function() {
   return { $$typeof: REACT_SCOPE_TYPE };
 };
-React.jsx = jsx;
-React.jsxs = jsx;
-var React$1 = { __proto__: null, default: React },
-  React$2 = (React$1 && React$1["default"]) || React$1;
-module.exports = React$2.default || React$2;
+exports.unstable_withSuspenseConfig = function(scope, config) {
+  var previousConfig = ReactCurrentBatchConfig.suspense;
+  ReactCurrentBatchConfig.suspense = void 0 === config ? null : config;
+  try {
+    scope();
+  } finally {
+    ReactCurrentBatchConfig.suspense = previousConfig;
+  }
+};
+exports.useCallback = function(callback, deps) {
+  return resolveDispatcher().useCallback(callback, deps);
+};
+exports.useContext = function(Context, unstable_observedBits) {
+  return resolveDispatcher().useContext(Context, unstable_observedBits);
+};
+exports.useDebugValue = function() {};
+exports.useDeferredValue = function(value, config) {
+  return resolveDispatcher().useDeferredValue(value, config);
+};
+exports.useEffect = function(create, deps) {
+  return resolveDispatcher().useEffect(create, deps);
+};
+exports.useImperativeHandle = function(ref, create, deps) {
+  return resolveDispatcher().useImperativeHandle(ref, create, deps);
+};
+exports.useLayoutEffect = function(create, deps) {
+  return resolveDispatcher().useLayoutEffect(create, deps);
+};
+exports.useMemo = function(create, deps) {
+  return resolveDispatcher().useMemo(create, deps);
+};
+exports.useReducer = function(reducer, initialArg, init) {
+  return resolveDispatcher().useReducer(reducer, initialArg, init);
+};
+exports.useRef = function(initialValue) {
+  return resolveDispatcher().useRef(initialValue);
+};
+exports.useState = function(initialState) {
+  return resolveDispatcher().useState(initialState);
+};
+exports.useTransition = function(config) {
+  return resolveDispatcher().useTransition(config);
+};
+exports.version = "16.12.0";

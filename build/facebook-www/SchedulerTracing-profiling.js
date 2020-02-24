@@ -10,7 +10,6 @@
  */
 
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: !0 });
 require("ReactFeatureFlags");
 var interactionIDCounter = 0,
   threadIDCounter = 0;

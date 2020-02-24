@@ -10,7 +10,6 @@
  */
 
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: !0 });
 var enableSchedulerDebugging = require("SchedulerFeatureFlags")
     .enableSchedulerDebugging,
   currentTime = 0,

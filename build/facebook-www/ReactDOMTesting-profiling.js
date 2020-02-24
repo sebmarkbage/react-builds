@@ -10999,69 +10999,24 @@ batchedEventUpdatesImpl = function(fn, a) {
       executionContext === NoContext && flushSyncCallbackQueue();
   }
 };
-var ReactDOM = {
-  createPortal: function(children, container) {
-    var key =
-      2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null;
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(200));
-    return createPortal(children, container, null, key);
-  },
-  unstable_batchedUpdates: batchedUpdates$1,
-  flushSync: flushSync,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    Events: [
-      getInstanceFromNode$2,
-      getNodeFromInstance$1,
-      getFiberCurrentPropsFromNode$1,
-      injectEventPluginsByName,
-      eventNameDispatchConfigs,
-      accumulateTwoPhaseDispatches,
-      function(events) {
-        forEachAccumulated(events, accumulateDirectDispatchesSingle);
-      },
-      enqueueStateRestore,
-      restoreStateIfNeeded,
-      dispatchEvent,
-      runEventsInBatch,
-      flushPassiveEffects,
-      IsThisRendererActing
-    ]
-  },
-  version: "16.12.0",
-  createRoot: function(container, options) {
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
-    return new ReactDOMRoot(container, options);
-  },
-  createBlockingRoot: function(container, options) {
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
-    return new ReactDOMBlockingRoot(container, 1, options);
-  }
-};
-ReactDOM.unstable_discreteUpdates = discreteUpdates$1;
-ReactDOM.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
-ReactDOM.unstable_flushControlled = function(fn) {
-  var prevExecutionContext = executionContext;
-  executionContext |= 1;
-  try {
-    runWithPriority$2(99, fn);
-  } finally {
-    (executionContext = prevExecutionContext),
-      executionContext === NoContext && flushSyncCallbackQueue();
-  }
-};
-ReactDOM.unstable_scheduleHydration = function(target) {
-  if (target) {
-    var priority = Scheduler.unstable_getCurrentPriorityLevel();
-    target = { blockedOn: null, target: target, priority: priority };
-    for (
-      var i = 0;
-      i < queuedExplicitHydrationTargets.length &&
-      !(priority <= queuedExplicitHydrationTargets[i].priority);
-      i++
-    );
-    queuedExplicitHydrationTargets.splice(i, 0, target);
-    0 === i && attemptExplicitHydrationTarget(target);
-  }
+var Internals = {
+  Events: [
+    getInstanceFromNode$2,
+    getNodeFromInstance$1,
+    getFiberCurrentPropsFromNode$1,
+    injectEventPluginsByName,
+    eventNameDispatchConfigs,
+    accumulateTwoPhaseDispatches,
+    function(events) {
+      forEachAccumulated(events, accumulateDirectDispatchesSingle);
+    },
+    enqueueStateRestore,
+    restoreStateIfNeeded,
+    dispatchEvent,
+    runEventsInBatch,
+    flushPassiveEffects,
+    IsThisRendererActing
+  ]
 };
 (function(devToolsConfig) {
   var findFiberByHostInstance = devToolsConfig.findFiberByHostInstance;
@@ -11094,7 +11049,8 @@ ReactDOM.unstable_scheduleHydration = function(target) {
   version: "16.12.0",
   rendererPackageName: "react-dom"
 });
-ReactDOM.act = function(callback) {
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+exports.act = function(callback) {
   function onDone() {
     actingUpdatesScopeDepth--;
     IsSomeRendererActing$1.current = previousIsSomeRendererActing;
@@ -11153,6 +11109,46 @@ ReactDOM.act = function(callback) {
     }
   };
 };
-var ReactDOM$1 = { __proto__: null, default: ReactDOM },
-  ReactDOM$2 = (ReactDOM$1 && ReactDOM$1["default"]) || ReactDOM$1;
-module.exports = ReactDOM$2.default || ReactDOM$2;
+exports.createBlockingRoot = function(container, options) {
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+  return new ReactDOMBlockingRoot(container, 1, options);
+};
+exports.createPortal = function(children, container) {
+  var key =
+    2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null;
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(200));
+  return createPortal(children, container, null, key);
+};
+exports.createRoot = function(container, options) {
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+  return new ReactDOMRoot(container, options);
+};
+exports.flushSync = flushSync;
+exports.unstable_batchedUpdates = batchedUpdates$1;
+exports.unstable_discreteUpdates = discreteUpdates$1;
+exports.unstable_flushControlled = function(fn) {
+  var prevExecutionContext = executionContext;
+  executionContext |= 1;
+  try {
+    runWithPriority$2(99, fn);
+  } finally {
+    (executionContext = prevExecutionContext),
+      executionContext === NoContext && flushSyncCallbackQueue();
+  }
+};
+exports.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
+exports.unstable_scheduleHydration = function(target) {
+  if (target) {
+    var priority = Scheduler.unstable_getCurrentPriorityLevel();
+    target = { blockedOn: null, target: target, priority: priority };
+    for (
+      var i = 0;
+      i < queuedExplicitHydrationTargets.length &&
+      !(priority <= queuedExplicitHydrationTargets[i].priority);
+      i++
+    );
+    queuedExplicitHydrationTargets.splice(i, 0, target);
+    0 === i && attemptExplicitHydrationTarget(target);
+  }
+};
+exports.version = "16.12.0";

@@ -15,16 +15,7 @@
 "use strict";
 var React = require("react"),
   Scheduler = require("scheduler"),
-  tracing = require("scheduler/tracing"),
-  _require = require("ReactFeatureFlags"),
-  deferPassiveEffectCleanupDuringUnmount =
-    _require.deferPassiveEffectCleanupDuringUnmount,
-  disableInputAttributeSyncing = _require.disableInputAttributeSyncing,
-  enableTrustedTypesIntegration = _require.enableTrustedTypesIntegration,
-  runAllPassiveEffectDestroysBeforeCreates =
-    _require.runAllPassiveEffectDestroysBeforeCreates,
-  disableSchedulerTimeoutBasedOnReactExpirationTime =
-    _require.disableSchedulerTimeoutBasedOnReactExpirationTime;
+  tracing = require("scheduler/tracing");
 function formatProdErrorMessage(code) {
   for (
     var url = "https://reactjs.org/docs/error-decoder.html?invariant=" + code,
@@ -341,6 +332,15 @@ function restoreStateIfNeeded() {
         restoreStateOfTarget(queuedTargets[target]);
   }
 }
+var _require = require("ReactFeatureFlags"),
+  deferPassiveEffectCleanupDuringUnmount =
+    _require.deferPassiveEffectCleanupDuringUnmount,
+  disableInputAttributeSyncing = _require.disableInputAttributeSyncing,
+  enableTrustedTypesIntegration = _require.enableTrustedTypesIntegration,
+  runAllPassiveEffectDestroysBeforeCreates =
+    _require.runAllPassiveEffectDestroysBeforeCreates,
+  disableSchedulerTimeoutBasedOnReactExpirationTime =
+    _require.disableSchedulerTimeoutBasedOnReactExpirationTime;
 function batchedUpdatesImpl(fn, bookkeeping) {
   return fn(bookkeeping);
 }
@@ -11349,69 +11349,24 @@ batchedEventUpdatesImpl = function(fn, a) {
       executionContext === NoContext && flushSyncCallbackQueue();
   }
 };
-var ReactDOM = {
-  createPortal: function(children, container) {
-    var key =
-      2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null;
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(200));
-    return createPortal(children, container, null, key);
-  },
-  unstable_batchedUpdates: batchedUpdates$1,
-  flushSync: flushSync,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    Events: [
-      getInstanceFromNode$2,
-      getNodeFromInstance$1,
-      getFiberCurrentPropsFromNode$1,
-      injectEventPluginsByName,
-      eventNameDispatchConfigs,
-      accumulateTwoPhaseDispatches,
-      function(events) {
-        forEachAccumulated(events, accumulateDirectDispatchesSingle);
-      },
-      enqueueStateRestore,
-      restoreStateIfNeeded,
-      dispatchEvent,
-      runEventsInBatch,
-      flushPassiveEffects,
-      { current: !1 }
-    ]
-  },
-  version: "16.12.0",
-  createRoot: function(container, options) {
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
-    return new ReactDOMRoot(container, options);
-  },
-  createBlockingRoot: function(container, options) {
-    if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
-    return new ReactDOMBlockingRoot(container, 1, options);
-  }
-};
-ReactDOM.unstable_discreteUpdates = discreteUpdates$1;
-ReactDOM.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
-ReactDOM.unstable_flushControlled = function(fn) {
-  var prevExecutionContext = executionContext;
-  executionContext |= 1;
-  try {
-    runWithPriority$2(99, fn);
-  } finally {
-    (executionContext = prevExecutionContext),
-      executionContext === NoContext && flushSyncCallbackQueue();
-  }
-};
-ReactDOM.unstable_scheduleHydration = function(target) {
-  if (target) {
-    var priority = Scheduler.unstable_getCurrentPriorityLevel();
-    target = { blockedOn: null, target: target, priority: priority };
-    for (
-      var i = 0;
-      i < queuedExplicitHydrationTargets.length &&
-      !(priority <= queuedExplicitHydrationTargets[i].priority);
-      i++
-    );
-    queuedExplicitHydrationTargets.splice(i, 0, target);
-    0 === i && attemptExplicitHydrationTarget(target);
-  }
+var Internals = {
+  Events: [
+    getInstanceFromNode$2,
+    getNodeFromInstance$1,
+    getFiberCurrentPropsFromNode$1,
+    injectEventPluginsByName,
+    eventNameDispatchConfigs,
+    accumulateTwoPhaseDispatches,
+    function(events) {
+      forEachAccumulated(events, accumulateDirectDispatchesSingle);
+    },
+    enqueueStateRestore,
+    restoreStateIfNeeded,
+    dispatchEvent,
+    runEventsInBatch,
+    flushPassiveEffects,
+    { current: !1 }
+  ]
 };
 (function(devToolsConfig) {
   var findFiberByHostInstance = devToolsConfig.findFiberByHostInstance;
@@ -11444,6 +11399,47 @@ ReactDOM.unstable_scheduleHydration = function(target) {
   version: "16.12.0",
   rendererPackageName: "react-dom"
 });
-var ReactDOMFB = { __proto__: null, default: ReactDOM },
-  ReactDOMFB$1 = (ReactDOMFB && ReactDOMFB["default"]) || ReactDOMFB;
-module.exports = ReactDOMFB$1.default || ReactDOMFB$1;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+exports.createBlockingRoot = function(container, options) {
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+  return new ReactDOMBlockingRoot(container, 1, options);
+};
+exports.createPortal = function(children, container) {
+  var key =
+    2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null;
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(200));
+  return createPortal(children, container, null, key);
+};
+exports.createRoot = function(container, options) {
+  if (!isValidContainer(container)) throw Error(formatProdErrorMessage(299));
+  return new ReactDOMRoot(container, options);
+};
+exports.flushSync = flushSync;
+exports.unstable_batchedUpdates = batchedUpdates$1;
+exports.unstable_discreteUpdates = discreteUpdates$1;
+exports.unstable_flushControlled = function(fn) {
+  var prevExecutionContext = executionContext;
+  executionContext |= 1;
+  try {
+    runWithPriority$2(99, fn);
+  } finally {
+    (executionContext = prevExecutionContext),
+      executionContext === NoContext && flushSyncCallbackQueue();
+  }
+};
+exports.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
+exports.unstable_scheduleHydration = function(target) {
+  if (target) {
+    var priority = Scheduler.unstable_getCurrentPriorityLevel();
+    target = { blockedOn: null, target: target, priority: priority };
+    for (
+      var i = 0;
+      i < queuedExplicitHydrationTargets.length &&
+      !(priority <= queuedExplicitHydrationTargets[i].priority);
+      i++
+    );
+    queuedExplicitHydrationTargets.splice(i, 0, target);
+    0 === i && attemptExplicitHydrationTarget(target);
+  }
+};
+exports.version = "16.12.0";

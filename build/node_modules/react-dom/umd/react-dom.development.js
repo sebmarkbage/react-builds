@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactDOM = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactDOM = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
   // Current owner and dispatcher used to share the same ref,
@@ -25792,6 +25792,7 @@
 
       unbatchedUpdates(function () {
         legacyRenderSubtreeIntoContainer(null, null, container, false, function () {
+          // $FlowFixMe This should probably use `delete container._reactRootContainer`
           container._reactRootContainer = null;
           unmarkContainerAsRoot(container);
         });
@@ -25856,67 +25857,42 @@
         throw Error( "Target container is not a DOM element." );
       }
     } // TODO: pass ReactDOM portal implementation as third argument
+    // $FlowFixMe The Flow type is opaque but there's no way to actually create it.
 
 
     return createPortal(children, container, null, key);
   }
 
-  var ReactDOM = {
-    createPortal: createPortal$1,
-    unstable_batchedUpdates: batchedUpdates$1,
-    flushSync: flushSync,
-    __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-      // Keep in sync with ReactDOMUnstableNativeDependencies.js
-      // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
-      Events: [getInstanceFromNode$1, getNodeFromInstance$1, getFiberCurrentPropsFromNode$1, injectEventPluginsByName, eventNameDispatchConfigs, accumulateTwoPhaseDispatches, accumulateDirectDispatches, enqueueStateRestore, restoreStateIfNeeded, dispatchEvent, runEventsInBatch, flushPassiveEffects, IsThisRendererActing]
-    },
-    version: ReactVersion
+  function scheduleHydration(target) {
+    if (target) {
+      queueExplicitHydrationTarget(target);
+    }
+  }
+
+  function renderSubtreeIntoContainer(parentComponent, element, containerNode, callback) {
+
+    return unstable_renderSubtreeIntoContainer(parentComponent, element, containerNode, callback);
+  }
+
+  function unstable_createPortal(children, container) {
+    var key = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+
+    {
+      if (!didWarnAboutUnstableCreatePortal) {
+        didWarnAboutUnstableCreatePortal = true;
+
+        warn('The ReactDOM.unstable_createPortal() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactDOM.createPortal() instead. It has the exact same API, ' + 'but without the "unstable_" prefix.');
+      }
+    }
+
+    return createPortal$1(children, container, key);
+  }
+
+  var Internals = {
+    // Keep in sync with ReactDOMUnstableNativeDependencies.js
+    // ReactTestUtils.js, and ReactTestUtilsAct.js. This is an array for better minification.
+    Events: [getInstanceFromNode$1, getNodeFromInstance$1, getFiberCurrentPropsFromNode$1, injectEventPluginsByName, eventNameDispatchConfigs, accumulateTwoPhaseDispatches, accumulateDirectDispatches, enqueueStateRestore, restoreStateIfNeeded, dispatchEvent, runEventsInBatch, flushPassiveEffects, IsThisRendererActing]
   };
-
-  {
-    ReactDOM.findDOMNode = findDOMNode;
-    ReactDOM.hydrate = hydrate;
-    ReactDOM.render = render;
-    ReactDOM.unmountComponentAtNode = unmountComponentAtNode;
-  }
-
-  {
-    ReactDOM.createRoot = createRoot;
-    ReactDOM.createBlockingRoot = createBlockingRoot;
-    ReactDOM.unstable_discreteUpdates = discreteUpdates$1;
-    ReactDOM.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
-    ReactDOM.unstable_flushControlled = flushControlled;
-
-    ReactDOM.unstable_scheduleHydration = function (target) {
-      if (target) {
-        queueExplicitHydrationTarget(target);
-      }
-    };
-  }
-
-  {
-    ReactDOM.unstable_renderSubtreeIntoContainer = function () {
-
-      return unstable_renderSubtreeIntoContainer.apply(void 0, arguments);
-    };
-  }
-
-  {
-    // Temporary alias since we already shipped React 16 RC with it.
-    // TODO: remove in React 17.
-    ReactDOM.unstable_createPortal = function () {
-      {
-        if (!didWarnAboutUnstableCreatePortal) {
-          didWarnAboutUnstableCreatePortal = true;
-
-          warn('The ReactDOM.unstable_createPortal() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactDOM.createPortal() instead. It has the exact same API, ' + 'but without the "unstable_" prefix.');
-        }
-      }
-
-      return createPortal$1.apply(void 0, arguments);
-    };
-  }
-
   var foundDevTools = injectIntoDevTools({
     findFiberByHostInstance: getClosestInstanceFromNode,
     bundleType:  1 ,
@@ -25938,12 +25914,22 @@
     }
   }
 
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest.
-
-
-  var reactDom = ReactDOM.default || ReactDOM;
-
-  return reactDom;
+  exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+  exports.createBlockingRoot = createBlockingRoot;
+  exports.createPortal = createPortal$1;
+  exports.createRoot = createRoot;
+  exports.findDOMNode = findDOMNode;
+  exports.flushSync = flushSync;
+  exports.hydrate = hydrate;
+  exports.render = render;
+  exports.unmountComponentAtNode = unmountComponentAtNode;
+  exports.unstable_batchedUpdates = batchedUpdates$1;
+  exports.unstable_createPortal = unstable_createPortal;
+  exports.unstable_discreteUpdates = discreteUpdates$1;
+  exports.unstable_flushControlled = flushControlled;
+  exports.unstable_flushDiscreteUpdates = flushDiscreteUpdates;
+  exports.unstable_renderSubtreeIntoContainer = renderSubtreeIntoContainer;
+  exports.unstable_scheduleHydration = scheduleHydration;
+  exports.version = ReactVersion;
 
 })));
