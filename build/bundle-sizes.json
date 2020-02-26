@@ -459,85 +459,85 @@
       "filename": "ReactNativeRenderer-dev.js",
       "bundleType": "RN_FB_DEV",
       "packageName": "react-native-renderer",
-      "size": 648847,
-      "gzip": 140187
+      "size": 648625,
+      "gzip": 140076
     },
     {
       "filename": "ReactNativeRenderer-prod.js",
       "bundleType": "RN_FB_PROD",
       "packageName": "react-native-renderer",
-      "size": 267796,
-      "gzip": 46433
+      "size": 267249,
+      "gzip": 46352
     },
     {
       "filename": "ReactNativeRenderer-profiling.js",
       "bundleType": "RN_FB_PROFILING",
       "packageName": "react-native-renderer",
-      "size": 279223,
-      "gzip": 48613
+      "size": 278668,
+      "gzip": 48533
     },
     {
       "filename": "ReactNativeRenderer-dev.js",
       "bundleType": "RN_OSS_DEV",
       "packageName": "react-native-renderer",
-      "size": 646076,
-      "gzip": 139884
+      "size": 645578,
+      "gzip": 139679
     },
     {
       "filename": "ReactNativeRenderer-prod.js",
       "bundleType": "RN_OSS_PROD",
       "packageName": "react-native-renderer",
-      "size": 267397,
-      "gzip": 46369
+      "size": 266850,
+      "gzip": 46288
     },
     {
       "filename": "ReactNativeRenderer-profiling.js",
       "bundleType": "RN_OSS_PROFILING",
       "packageName": "react-native-renderer",
-      "size": 278829,
-      "gzip": 48549
+      "size": 278274,
+      "gzip": 48468
     },
     {
       "filename": "ReactFabric-dev.js",
       "bundleType": "RN_FB_DEV",
       "packageName": "react-native-renderer",
-      "size": 630578,
-      "gzip": 135926
+      "size": 630112,
+      "gzip": 135683
     },
     {
       "filename": "ReactFabric-prod.js",
       "bundleType": "RN_FB_PROD",
       "packageName": "react-native-renderer",
-      "size": 259657,
-      "gzip": 44991
+      "size": 258919,
+      "gzip": 44848
     },
     {
       "filename": "ReactFabric-profiling.js",
       "bundleType": "RN_FB_PROFILING",
       "packageName": "react-native-renderer",
-      "size": 271088,
-      "gzip": 47167
+      "size": 270338,
+      "gzip": 47022
     },
     {
       "filename": "ReactFabric-dev.js",
       "bundleType": "RN_OSS_DEV",
       "packageName": "react-native-renderer",
-      "size": 627869,
-      "gzip": 135626
+      "size": 627161,
+      "gzip": 135295
     },
     {
       "filename": "ReactFabric-prod.js",
       "bundleType": "RN_OSS_PROD",
       "packageName": "react-native-renderer",
-      "size": 259299,
-      "gzip": 44906
+      "size": 258561,
+      "gzip": 44761
     },
     {
       "filename": "ReactFabric-profiling.js",
       "bundleType": "RN_OSS_PROFILING",
       "packageName": "react-native-renderer",
-      "size": 270735,
-      "gzip": 47094
+      "size": 269985,
+      "gzip": 46949
     },
     {
       "filename": "react-test-renderer.development.js",

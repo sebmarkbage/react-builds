@@ -20855,6 +20855,70 @@ function findNodeHandle(componentOrHandle) {
   return hostInstance._nativeTag;
 }
 
+function dispatchCommand(handle, command, args) {
+  if (handle._nativeTag == null) {
+    {
+      error(
+        "dispatchCommand was called with a ref that isn't a " +
+          "native component. Use React.forwardRef to get access to the underlying native component"
+      );
+    }
+
+    return;
+  }
+
+  if (handle._internalInstanceHandle) {
+    nativeFabricUIManager.dispatchCommand(
+      handle._internalInstanceHandle.stateNode.node,
+      command,
+      args
+    );
+  } else {
+    ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
+      handle._nativeTag,
+      command,
+      args
+    );
+  }
+}
+
+function render(element, containerTag, callback) {
+  var root = roots.get(containerTag);
+
+  if (!root) {
+    // TODO (bvaughn): If we decide to keep the wrapper component,
+    // We could create a wrapper for containerTag as well to reduce special casing.
+    root = createContainer(containerTag, LegacyRoot, false);
+    roots.set(containerTag, root);
+  }
+
+  updateContainer(element, root, null, callback);
+  return getPublicRootInstance(root);
+}
+
+function unmountComponentAtNode(containerTag) {
+  var root = roots.get(containerTag);
+
+  if (root) {
+    // TODO: Is it safe to reset this now or should I wait since this unmount could be deferred?
+    updateContainer(null, root, null, function() {
+      roots.delete(containerTag);
+    });
+  }
+}
+
+function unmountComponentAtNodeAndRemoveContainer(containerTag) {
+  unmountComponentAtNode(containerTag); // Call back into native to remove all of the subviews from this container
+
+  ReactNativePrivateInterface.UIManager.removeRootView(containerTag);
+}
+
+function createPortal$1(children, containerTag) {
+  var key =
+    arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+  return createPortal(children, containerTag, null, key);
+}
+
 setBatchingImplementation(batchedUpdates$1);
 
 function computeComponentStackForErrorReporting(reactTag) {
@@ -20868,74 +20932,8 @@ function computeComponentStackForErrorReporting(reactTag) {
 }
 
 var roots = new Map();
-var ReactNativeRenderer = {
-  // This is needed for implementation details of TouchableNativeFeedback
-  // Remove this once TouchableNativeFeedback doesn't use cloneElement
-  findHostInstance_DEPRECATED: findHostInstance_DEPRECATED,
-  findNodeHandle: findNodeHandle,
-  dispatchCommand: function(handle, command, args) {
-    if (handle._nativeTag == null) {
-      {
-        error(
-          "dispatchCommand was called with a ref that isn't a " +
-            "native component. Use React.forwardRef to get access to the underlying native component"
-        );
-      }
-
-      return;
-    }
-
-    if (handle._internalInstanceHandle) {
-      nativeFabricUIManager.dispatchCommand(
-        handle._internalInstanceHandle.stateNode.node,
-        command,
-        args
-      );
-    } else {
-      ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
-        handle._nativeTag,
-        command,
-        args
-      );
-    }
-  },
-  render: function(element, containerTag, callback) {
-    var root = roots.get(containerTag);
-
-    if (!root) {
-      // TODO (bvaughn): If we decide to keep the wrapper component,
-      // We could create a wrapper for containerTag as well to reduce special casing.
-      root = createContainer(containerTag, LegacyRoot, false);
-      roots.set(containerTag, root);
-    }
-
-    updateContainer(element, root, null, callback);
-    return getPublicRootInstance(root);
-  },
-  unmountComponentAtNode: function(containerTag) {
-    var root = roots.get(containerTag);
-
-    if (root) {
-      // TODO: Is it safe to reset this now or should I wait since this unmount could be deferred?
-      updateContainer(null, root, null, function() {
-        roots.delete(containerTag);
-      });
-    }
-  },
-  unmountComponentAtNodeAndRemoveContainer: function(containerTag) {
-    ReactNativeRenderer.unmountComponentAtNode(containerTag); // Call back into native to remove all of the subviews from this container
-
-    ReactNativePrivateInterface.UIManager.removeRootView(containerTag);
-  },
-  createPortal: function(children, containerTag) {
-    var key =
-      arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
-    return createPortal(children, containerTag, null, key);
-  },
-  unstable_batchedUpdates: batchedUpdates,
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    computeComponentStackForErrorReporting: computeComponentStackForErrorReporting
-  }
+var Internals = {
+  computeComponentStackForErrorReporting: computeComponentStackForErrorReporting
 };
 injectIntoDevTools({
   findFiberByHostInstance: getInstanceFromTag,
@@ -20945,12 +20943,15 @@ injectIntoDevTools({
   rendererPackageName: "react-native-renderer"
 });
 
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var reactNativeRenderer = ReactNativeRenderer.default || ReactNativeRenderer;
-
-module.exports = reactNativeRenderer;
+exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = Internals;
+exports.createPortal = createPortal$1;
+exports.dispatchCommand = dispatchCommand;
+exports.findHostInstance_DEPRECATED = findHostInstance_DEPRECATED;
+exports.findNodeHandle = findNodeHandle;
+exports.render = render;
+exports.unmountComponentAtNode = unmountComponentAtNode;
+exports.unmountComponentAtNodeAndRemoveContainer = unmountComponentAtNodeAndRemoveContainer;
+exports.unstable_batchedUpdates = batchedUpdates;
 
   })();
 }

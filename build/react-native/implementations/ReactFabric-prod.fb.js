@@ -7359,96 +7359,82 @@ var roots = new Map();
   version: "16.12.0",
   rendererPackageName: "react-native-renderer"
 });
-var ReactFabric$1 = {
-    __proto__: null,
-    default: {
-      findHostInstance_DEPRECATED: function(componentOrHandle) {
-        if (null == componentOrHandle) return null;
-        if (componentOrHandle._nativeTag) return componentOrHandle;
-        if (
-          componentOrHandle.canonical &&
-          componentOrHandle.canonical._nativeTag
+exports.createPortal = function(children, containerTag) {
+  return createPortal(
+    children,
+    containerTag,
+    null,
+    2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null
+  );
+};
+exports.dispatchCommand = function(handle, command, args) {
+  null != handle._nativeTag &&
+    (handle._internalInstanceHandle
+      ? nativeFabricUIManager.dispatchCommand(
+          handle._internalInstanceHandle.stateNode.node,
+          command,
+          args
         )
-          return componentOrHandle.canonical;
-        componentOrHandle = findHostInstance(componentOrHandle);
-        return null == componentOrHandle
-          ? componentOrHandle
-          : componentOrHandle.canonical
-          ? componentOrHandle.canonical
-          : componentOrHandle;
-      },
-      findNodeHandle: function(componentOrHandle) {
-        if (null == componentOrHandle) return null;
-        if ("number" === typeof componentOrHandle) return componentOrHandle;
-        if (componentOrHandle._nativeTag) return componentOrHandle._nativeTag;
-        if (
-          componentOrHandle.canonical &&
-          componentOrHandle.canonical._nativeTag
-        )
-          return componentOrHandle.canonical._nativeTag;
-        componentOrHandle = findHostInstance(componentOrHandle);
-        return null == componentOrHandle
-          ? componentOrHandle
-          : componentOrHandle.canonical
-          ? componentOrHandle.canonical._nativeTag
-          : componentOrHandle._nativeTag;
-      },
-      dispatchCommand: function(handle, command, args) {
-        null != handle._nativeTag &&
-          (handle._internalInstanceHandle
-            ? nativeFabricUIManager.dispatchCommand(
-                handle._internalInstanceHandle.stateNode.node,
-                command,
-                args
-              )
-            : ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
-                handle._nativeTag,
-                command,
-                args
-              ));
-      },
-      render: function(element, containerTag, callback) {
-        var root = roots.get(containerTag);
-        if (!root) {
-          root = new FiberRootNode(containerTag, 0, !1);
-          var uninitializedFiber = new FiberNode(3, null, null, 0);
-          root.current = uninitializedFiber;
-          uninitializedFiber.stateNode = root;
-          initializeUpdateQueue(uninitializedFiber);
-          roots.set(containerTag, root);
-        }
-        updateContainer(element, root, null, callback);
-        a: if (((element = root.current), element.child))
-          switch (element.child.tag) {
-            case 5:
-              element = element.child.stateNode.canonical;
-              break a;
-            default:
-              element = element.child.stateNode;
-          }
-        else element = null;
-        return element;
-      },
-      unmountComponentAtNode: function(containerTag) {
-        this.stopSurface(containerTag);
-      },
-      stopSurface: function(containerTag) {
-        var root = roots.get(containerTag);
-        root &&
-          updateContainer(null, root, null, function() {
-            roots.delete(containerTag);
-          });
-      },
-      createPortal: function(children, containerTag) {
-        return createPortal(
-          children,
-          containerTag,
-          null,
-          2 < arguments.length && void 0 !== arguments[2] ? arguments[2] : null
-        );
-      },
-      __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {}
+      : ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
+          handle._nativeTag,
+          command,
+          args
+        ));
+};
+exports.findHostInstance_DEPRECATED = function(componentOrHandle) {
+  if (null == componentOrHandle) return null;
+  if (componentOrHandle._nativeTag) return componentOrHandle;
+  if (componentOrHandle.canonical && componentOrHandle.canonical._nativeTag)
+    return componentOrHandle.canonical;
+  componentOrHandle = findHostInstance(componentOrHandle);
+  return null == componentOrHandle
+    ? componentOrHandle
+    : componentOrHandle.canonical
+    ? componentOrHandle.canonical
+    : componentOrHandle;
+};
+exports.findNodeHandle = function(componentOrHandle) {
+  if (null == componentOrHandle) return null;
+  if ("number" === typeof componentOrHandle) return componentOrHandle;
+  if (componentOrHandle._nativeTag) return componentOrHandle._nativeTag;
+  if (componentOrHandle.canonical && componentOrHandle.canonical._nativeTag)
+    return componentOrHandle.canonical._nativeTag;
+  componentOrHandle = findHostInstance(componentOrHandle);
+  return null == componentOrHandle
+    ? componentOrHandle
+    : componentOrHandle.canonical
+    ? componentOrHandle.canonical._nativeTag
+    : componentOrHandle._nativeTag;
+};
+exports.render = function(element, containerTag, callback) {
+  var root = roots.get(containerTag);
+  if (!root) {
+    root = new FiberRootNode(containerTag, 0, !1);
+    var uninitializedFiber = new FiberNode(3, null, null, 0);
+    root.current = uninitializedFiber;
+    uninitializedFiber.stateNode = root;
+    initializeUpdateQueue(uninitializedFiber);
+    roots.set(containerTag, root);
+  }
+  updateContainer(element, root, null, callback);
+  a: if (((element = root.current), element.child))
+    switch (element.child.tag) {
+      case 5:
+        element = element.child.stateNode.canonical;
+        break a;
+      default:
+        element = element.child.stateNode;
     }
-  },
-  ReactFabric$2 = (ReactFabric$1 && ReactFabric$1["default"]) || ReactFabric$1;
-module.exports = ReactFabric$2.default || ReactFabric$2;
+  else element = null;
+  return element;
+};
+exports.stopSurface = function(containerTag) {
+  var root = roots.get(containerTag);
+  root &&
+    updateContainer(null, root, null, function() {
+      roots.delete(containerTag);
+    });
+};
+exports.unmountComponentAtNode = function(containerTag) {
+  this.stopSurface(containerTag);
+};

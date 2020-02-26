@@ -20169,74 +20169,70 @@ function findNodeHandle(componentOrHandle) {
   return hostInstance._nativeTag;
 }
 
+function dispatchCommand(handle, command, args) {
+  if (handle._nativeTag == null) {
+    {
+      error(
+        "dispatchCommand was called with a ref that isn't a " +
+          "native component. Use React.forwardRef to get access to the underlying native component"
+      );
+    }
+
+    return;
+  }
+
+  if (handle._internalInstanceHandle) {
+    nativeFabricUIManager.dispatchCommand(
+      handle._internalInstanceHandle.stateNode.node,
+      command,
+      args
+    );
+  } else {
+    ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
+      handle._nativeTag,
+      command,
+      args
+    );
+  }
+}
+
+function render(element, containerTag, callback) {
+  var root = roots.get(containerTag);
+
+  if (!root) {
+    // TODO (bvaughn): If we decide to keep the wrapper component,
+    // We could create a wrapper for containerTag as well to reduce special casing.
+    root = createContainer(containerTag, LegacyRoot, false);
+    roots.set(containerTag, root);
+  }
+
+  updateContainer(element, root, null, callback);
+  return getPublicRootInstance(root);
+}
+
+function unmountComponentAtNode(containerTag) {
+  this.stopSurface(containerTag);
+}
+
+function stopSurface(containerTag) {
+  var root = roots.get(containerTag);
+
+  if (root) {
+    // TODO: Is it safe to reset this now or should I wait since this unmount could be deferred?
+    updateContainer(null, root, null, function() {
+      roots.delete(containerTag);
+    });
+  }
+}
+
+function createPortal$1(children, containerTag) {
+  var key =
+    arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+  return createPortal(children, containerTag, null, key);
+}
+
 setBatchingImplementation(batchedUpdates$1);
 var roots = new Map();
-var ReactFabric = {
-  // This is needed for implementation details of TouchableNativeFeedback
-  // Remove this once TouchableNativeFeedback doesn't use cloneElement
-  findHostInstance_DEPRECATED: findHostInstance_DEPRECATED,
-  findNodeHandle: findNodeHandle,
-  dispatchCommand: function(handle, command, args) {
-    if (handle._nativeTag == null) {
-      {
-        error(
-          "dispatchCommand was called with a ref that isn't a " +
-            "native component. Use React.forwardRef to get access to the underlying native component"
-        );
-      }
-
-      return;
-    }
-
-    if (handle._internalInstanceHandle) {
-      nativeFabricUIManager.dispatchCommand(
-        handle._internalInstanceHandle.stateNode.node,
-        command,
-        args
-      );
-    } else {
-      ReactNativePrivateInterface.UIManager.dispatchViewManagerCommand(
-        handle._nativeTag,
-        command,
-        args
-      );
-    }
-  },
-  render: function(element, containerTag, callback) {
-    var root = roots.get(containerTag);
-
-    if (!root) {
-      // TODO (bvaughn): If we decide to keep the wrapper component,
-      // We could create a wrapper for containerTag as well to reduce special casing.
-      root = createContainer(containerTag, LegacyRoot, false);
-      roots.set(containerTag, root);
-    }
-
-    updateContainer(element, root, null, callback);
-    return getPublicRootInstance(root);
-  },
-  // Deprecated - this function is being renamed to stopSurface, use that instead.
-  // TODO (T47576999): Delete this once it's no longer called from native code.
-  unmountComponentAtNode: function(containerTag) {
-    this.stopSurface(containerTag);
-  },
-  stopSurface: function(containerTag) {
-    var root = roots.get(containerTag);
-
-    if (root) {
-      // TODO: Is it safe to reset this now or should I wait since this unmount could be deferred?
-      updateContainer(null, root, null, function() {
-        roots.delete(containerTag);
-      });
-    }
-  },
-  createPortal: function(children, containerTag) {
-    var key =
-      arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
-    return createPortal(children, containerTag, null, key);
-  },
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {}
-};
 injectIntoDevTools({
   findFiberByHostInstance: getInstanceFromInstance,
   getInspectorDataForViewTag: getInspectorDataForViewTag,
@@ -20245,23 +20241,13 @@ injectIntoDevTools({
   rendererPackageName: "react-native-renderer"
 });
 
-var ReactFabric$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: ReactFabric
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var ReactFabric$2 = getCjsExportFromNamespace(ReactFabric$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var fabric = ReactFabric$2.default || ReactFabric$2;
-
-module.exports = fabric;
+exports.createPortal = createPortal$1;
+exports.dispatchCommand = dispatchCommand;
+exports.findHostInstance_DEPRECATED = findHostInstance_DEPRECATED;
+exports.findNodeHandle = findNodeHandle;
+exports.render = render;
+exports.stopSurface = stopSurface;
+exports.unmountComponentAtNode = unmountComponentAtNode;
 
   })();
 }
