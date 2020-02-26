@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * @preserve-invariant-messages
  */
@@ -19,8 +20,10 @@ var React = require("react"),
       : !1,
   DEFAULT_PRESS_RETENTION_OFFSET = { bottom: 20, top: 20, left: 20, right: 20 },
   rootEventTypes = hasPointerEvents
-    ? "pointerup_active pointermove pointercancel click keyup scroll".split(" ")
-    : "click keyup scroll mousemove touchmove touchcancel dragstart mouseup_active touchend".split(
+    ? "pointerup_active pointermove pointercancel click keyup scroll blur".split(
+        " "
+      )
+    : "click keyup scroll mousemove touchmove touchcancel dragstart mouseup_active touchend blur".split(
         " "
       );
 function isFunction(obj) {
@@ -137,6 +140,13 @@ function dispatchPressEndEvents(event, context, props, state) {
     isFunction(event) && context.dispatchEvent(state.isActivePressed, event, 0);
   }
   state.responderRegionOnDeactivation = null;
+}
+function dispatchCancel(event, context, props, state) {
+  state.touchEvent = null;
+  state.isPressed &&
+    ((state.ignoreEmulatedMouseEvents = !1),
+    dispatchPressEndEvents(event, context, props, state));
+  removeRootEventTypes(context, state);
 }
 function isValidKeyboardEvent(nativeEvent) {
   var key = nativeEvent.key,
@@ -469,20 +479,18 @@ var PressResponder = React.DEPRECATED_createResponder("Press", {
           null === pointerType ||
             (nativeEvent !== target &&
               !context.isTargetWithinNode(pointerType, nativeEvent)) ||
-            ((state.touchEvent = null),
-            state.isPressed &&
-              ((state.ignoreEmulatedMouseEvents = !1),
-              dispatchPressEndEvents(event, context, props, state)),
-            removeRootEventTypes(context, state));
+            dispatchCancel(event, context, props, state);
           break;
         case "pointercancel":
         case "touchcancel":
         case "dragstart":
-          (state.touchEvent = null),
-            state.isPressed &&
-              ((state.ignoreEmulatedMouseEvents = !1),
-              dispatchPressEndEvents(event, context, props, state)),
-            removeRootEventTypes(context, state);
+          dispatchCancel(event, context, props, state);
+          break;
+        case "blur":
+          !isPressed ||
+            (null !== nativeEvent.relatedTarget &&
+              target !== state.pressTarget) ||
+            dispatchCancel(event, context, props, state);
       }
     },
     onUnmount: function(context, props, state) {

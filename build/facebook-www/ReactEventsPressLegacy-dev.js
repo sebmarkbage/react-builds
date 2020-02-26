@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  *
  * @noflow
+ * @nolint
  * @preventMunge
  * @preserve-invariant-messages
  */
@@ -91,7 +92,8 @@ var rootEventTypes = hasPointerEvents
       "pointercancel",
       "click",
       "keyup",
-      "scroll"
+      "scroll",
+      "blur"
     ]
   : [
       "click",
@@ -102,7 +104,8 @@ var rootEventTypes = hasPointerEvents
       "touchcancel", // Used as a 'cancel' signal for mouse interactions
       "dragstart",
       "mouseup_active",
-      "touchend"
+      "touchend",
+      "blur"
     ];
 
 function isFunction(obj) {
@@ -861,6 +864,22 @@ var pressResponderImpl = {
       case "touchcancel":
       case "dragstart": {
         dispatchCancel(event, context, props, state);
+        break;
+      }
+
+      case "blur": {
+        // If we encounter a blur event that moves focus to
+        // the window, then the relatedTarget will be null.
+        // In this case, we should cancel the active press.
+        // Alternatively, if the blur target matches the
+        // current pressed target, we should also cancel
+        // the active press.
+        if (
+          isPressed &&
+          (nativeEvent.relatedTarget === null || target === state.pressTarget)
+        ) {
+          dispatchCancel(event, context, props, state);
+        }
       }
     }
   },
