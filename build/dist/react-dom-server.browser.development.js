@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactDOMServer = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactDOMServer = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   // Do not require this module directly! Use normal `invariant` calls with
   // template literal strings. The messages will be replaced with error codes
@@ -4173,23 +4173,12 @@
         throw Error( "ReactDOMServer.renderToStaticNodeStream(): The streaming API is not available in the browser. Use ReactDOMServer.renderToStaticMarkup() instead." );
       }
     }
-  } // Note: when changing this, also consider https://github.com/facebook/react/issues/11526
+  }
 
-
-  var ReactDOMServer = {
-    renderToString: renderToString,
-    renderToStaticMarkup: renderToStaticMarkup,
-    renderToNodeStream: renderToNodeStream,
-    renderToStaticNodeStream: renderToStaticNodeStream,
-    version: ReactVersion
-  };
-
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest
-
-
-  var server_browser = ReactDOMServer.default || ReactDOMServer;
-
-  return server_browser;
+  exports.renderToNodeStream = renderToNodeStream;
+  exports.renderToStaticMarkup = renderToStaticMarkup;
+  exports.renderToStaticNodeStream = renderToStaticNodeStream;
+  exports.renderToString = renderToString;
+  exports.version = ReactVersion;
 
 })));

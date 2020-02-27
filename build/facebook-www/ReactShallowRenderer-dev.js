@@ -1187,25 +1187,9 @@ function getMaskedContext(contextTypes, unmaskedContext) {
   }
 
   return context;
-}
+} // This should probably be a default export and a named export.
 
-var ReactShallowRenderer$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: ReactShallowRenderer
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var ReactShallowRenderer$2 = getCjsExportFromNamespace(ReactShallowRenderer$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest.
-
-var shallow = ReactShallowRenderer$2.default || ReactShallowRenderer$2;
-
-module.exports = shallow;
+module.exports = ReactShallowRenderer;
 
   })();
 }

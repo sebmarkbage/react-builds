@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react'), require('scheduler/unstable_mock'), require('scheduler')) :
-  typeof define === 'function' && define.amd ? define(['react', 'scheduler/unstable_mock', 'scheduler'], factory) :
-  (global = global || self, global.ReactTestRenderer = factory(global.React, global.SchedulerMock, global.Scheduler));
-}(this, (function (React, Scheduler, Scheduler$1) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react'), require('scheduler/unstable_mock'), require('scheduler')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react', 'scheduler/unstable_mock', 'scheduler'], factory) :
+  (global = global || self, factory(global.ReactTestRenderer = {}, global.React, global.SchedulerMock, global.Scheduler));
+}(this, (function (exports, React, Scheduler, Scheduler$1) { 'use strict';
 
   function _defineProperties(target, props) {
     for (var i = 0; i < props.length; i++) {
@@ -15557,141 +15557,135 @@
     return true;
   }
 
-  var ReactTestRendererFiber = {
-    _Scheduler: Scheduler,
-    create: function (element, options) {
-      var createNodeMock = defaultTestOptions.createNodeMock;
-      var isConcurrent = false;
+  function create(element, options) {
+    var createNodeMock = defaultTestOptions.createNodeMock;
+    var isConcurrent = false;
 
-      if (typeof options === 'object' && options !== null) {
-        if (typeof options.createNodeMock === 'function') {
-          createNodeMock = options.createNodeMock;
-        }
-
-        if (options.unstable_isConcurrent === true) {
-          isConcurrent = true;
-        }
+    if (typeof options === 'object' && options !== null) {
+      if (typeof options.createNodeMock === 'function') {
+        createNodeMock = options.createNodeMock;
       }
 
-      var container = {
-        children: [],
-        createNodeMock: createNodeMock,
-        tag: 'CONTAINER'
-      };
-      var root = createContainer(container, isConcurrent ? ConcurrentRoot : LegacyRoot, false);
-
-      if (!(root != null)) {
-        {
-          throw Error( "something went wrong" );
-        }
+      if (options.unstable_isConcurrent === true) {
+        isConcurrent = true;
       }
+    }
 
-      updateContainer(element, root, null, null);
-      var entry = {
-        _Scheduler: Scheduler,
-        root: undefined,
-        // makes flow happy
-        // we define a 'getter' for 'root' below using 'Object.defineProperty'
-        toJSON: function () {
-          if (root == null || root.current == null || container == null) {
-            return null;
-          }
+    var container = {
+      children: [],
+      createNodeMock: createNodeMock,
+      tag: 'CONTAINER'
+    };
+    var root = createContainer(container, isConcurrent ? ConcurrentRoot : LegacyRoot, false);
 
-          if (container.children.length === 0) {
-            return null;
-          }
+    if (!(root != null)) {
+      {
+        throw Error( "something went wrong" );
+      }
+    }
 
-          if (container.children.length === 1) {
-            return toJSON(container.children[0]);
-          }
+    updateContainer(element, root, null, null);
+    var entry = {
+      _Scheduler: Scheduler,
+      root: undefined,
+      // makes flow happy
+      // we define a 'getter' for 'root' below using 'Object.defineProperty'
+      toJSON: function () {
+        if (root == null || root.current == null || container == null) {
+          return null;
+        }
 
-          if (container.children.length === 2 && container.children[0].isHidden === true && container.children[1].isHidden === false) {
-            // Omit timed out children from output entirely, including the fact that we
-            // temporarily wrap fallback and timed out children in an array.
-            return toJSON(container.children[1]);
-          }
+        if (container.children.length === 0) {
+          return null;
+        }
 
-          var renderedChildren = null;
+        if (container.children.length === 1) {
+          return toJSON(container.children[0]);
+        }
 
-          if (container.children && container.children.length) {
-            for (var i = 0; i < container.children.length; i++) {
-              var renderedChild = toJSON(container.children[i]);
+        if (container.children.length === 2 && container.children[0].isHidden === true && container.children[1].isHidden === false) {
+          // Omit timed out children from output entirely, including the fact that we
+          // temporarily wrap fallback and timed out children in an array.
+          return toJSON(container.children[1]);
+        }
 
-              if (renderedChild !== null) {
-                if (renderedChildren === null) {
-                  renderedChildren = [renderedChild];
-                } else {
-                  renderedChildren.push(renderedChild);
-                }
+        var renderedChildren = null;
+
+        if (container.children && container.children.length) {
+          for (var i = 0; i < container.children.length; i++) {
+            var renderedChild = toJSON(container.children[i]);
+
+            if (renderedChild !== null) {
+              if (renderedChildren === null) {
+                renderedChildren = [renderedChild];
+              } else {
+                renderedChildren.push(renderedChild);
               }
             }
           }
-
-          return renderedChildren;
-        },
-        toTree: function () {
-          if (root == null || root.current == null) {
-            return null;
-          }
-
-          return toTree(root.current);
-        },
-        update: function (newElement) {
-          if (root == null || root.current == null) {
-            return;
-          }
-
-          updateContainer(newElement, root, null, null);
-        },
-        unmount: function () {
-          if (root == null || root.current == null) {
-            return;
-          }
-
-          updateContainer(null, root, null, null);
-          container = null;
-          root = null;
-        },
-        getInstance: function () {
-          if (root == null || root.current == null) {
-            return null;
-          }
-
-          return getPublicRootInstance(root);
-        },
-        unstable_flushSync: function (fn) {
-          return flushSync(fn);
         }
-      };
-      Object.defineProperty(entry, 'root', {
-        configurable: true,
-        enumerable: true,
-        get: function () {
-          if (root === null) {
-            throw new Error("Can't access .root on unmounted test renderer");
-          }
 
-          var children = getChildren(root.current);
-
-          if (children.length === 0) {
-            throw new Error("Can't access .root on unmounted test renderer");
-          } else if (children.length === 1) {
-            // Normally, we skip the root and just give you the child.
-            return children[0];
-          } else {
-            // However, we give you the root if there's more than one root child.
-            // We could make this the behavior for all cases but it would be a breaking change.
-            return wrapFiber(root.current);
-          }
+        return renderedChildren;
+      },
+      toTree: function () {
+        if (root == null || root.current == null) {
+          return null;
         }
-      });
-      return entry;
-    },
 
-    /* eslint-disable-next-line camelcase */
-    unstable_batchedUpdates: batchedUpdates,
-    act: act
-  };
+        return toTree(root.current);
+      },
+      update: function (newElement) {
+        if (root == null || root.current == null) {
+          return;
+        }
+
+        updateContainer(newElement, root, null, null);
+      },
+      unmount: function () {
+        if (root == null || root.current == null) {
+          return;
+        }
+
+        updateContainer(null, root, null, null);
+        container = null;
+        root = null;
+      },
+      getInstance: function () {
+        if (root == null || root.current == null) {
+          return null;
+        }
+
+        return getPublicRootInstance(root);
+      },
+      unstable_flushSync: function (fn) {
+        return flushSync(fn);
+      }
+    };
+    Object.defineProperty(entry, 'root', {
+      configurable: true,
+      enumerable: true,
+      get: function () {
+        if (root === null) {
+          throw new Error("Can't access .root on unmounted test renderer");
+        }
+
+        var children = getChildren(root.current);
+
+        if (children.length === 0) {
+          throw new Error("Can't access .root on unmounted test renderer");
+        } else if (children.length === 1) {
+          // Normally, we skip the root and just give you the child.
+          return children[0];
+        } else {
+          // However, we give you the root if there's more than one root child.
+          // We could make this the behavior for all cases but it would be a breaking change.
+          return wrapFiber(root.current);
+        }
+      }
+    });
+    return entry;
+  }
+
   var fiberToWrapper = new WeakMap();
 
   function wrapFiber(fiber) {
@@ -15719,12 +15713,9 @@
     rendererPackageName: 'react-test-renderer'
   });
 
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest.
-
-
-  var reactTestRenderer = ReactTestRendererFiber.default || ReactTestRendererFiber;
-
-  return reactTestRenderer;
+  exports._Scheduler = Scheduler;
+  exports.act = act;
+  exports.create = create;
+  exports.unstable_batchedUpdates = batchedUpdates;
 
 })));

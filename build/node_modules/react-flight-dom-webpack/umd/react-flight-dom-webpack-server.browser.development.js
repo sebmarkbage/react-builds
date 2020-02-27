@@ -13,7 +13,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react-dom/server')) :
   typeof define === 'function' && define.amd ? define(['react-dom/server'], factory) :
   (global = global || self, global.ReactFlightDOMServer = factory(global.ReactDOMServer));
-}(this, (function (ReactDOMServer) { 'use strict';
+}(this, (function (server) { 'use strict';
 
   function scheduleWork(callback) {
     callback();
@@ -35,7 +35,7 @@
     // so we can't actually reference the renderer here. Instead, we
     // should replace this method with a reference to Fizz which
     // then uses this file to implement the server renderer.
-    return ReactDOMServer.renderToStaticMarkup(children);
+    return server.renderToStaticMarkup(children);
   }
 
   // The Symbol used to tag the ReactElement-like types. If there is no native Symbol

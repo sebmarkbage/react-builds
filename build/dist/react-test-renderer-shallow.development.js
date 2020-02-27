@@ -1163,14 +1163,8 @@
     }
 
     return context;
-  }
+  } // This should probably be a default export and a named export.
 
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest.
-
-
-  var shallow = ReactShallowRenderer.default || ReactShallowRenderer;
-
-  return shallow;
+  return ReactShallowRenderer;
 
 })));

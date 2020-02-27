@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global.ReactDOMFizzServer = factory());
-}(this, (function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = global || self, factory(global.ReactDOMFizzServer = {}));
+}(this, (function (exports) { 'use strict';
 
   function scheduleWork(callback) {
     callback();
@@ -126,16 +126,6 @@
     });
   }
 
-  var ReactDOMFizzServerBrowser = {
-    renderToReadableStream: renderToReadableStream
-  };
-
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest
-
-
-  var unstableFizz_browser = ReactDOMFizzServerBrowser.default || ReactDOMFizzServerBrowser;
-
-  return unstableFizz_browser;
+  exports.renderToReadableStream = renderToReadableStream;
 
 })));

@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react-dom'), require('react')) :
-  typeof define === 'function' && define.amd ? define(['react-dom', 'react'], factory) :
-  (global = global || self, global.ReactDOMUnstableNativeDependencies = factory(global.ReactDOM, global.React));
-}(this, (function (ReactDOM, React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react-dom'), require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react-dom', 'react'], factory) :
+  (global = global || self, factory(global.ReactDOMUnstableNativeDependencies = {}, global.ReactDOM, global.React));
+}(this, (function (exports, ReactDOM, React) { 'use strict';
 
   var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
   // Current owner and dispatcher used to share the same ref,
@@ -1614,15 +1614,8 @@
       injectEventPluginsByName = _ReactDOM$__SECRET_IN[3];
   setComponentTree(getFiberCurrentPropsFromNode$1, getInstanceFromNode$1, getNodeFromInstance$1);
 
-  var ReactDOMUnstableNativeDependencies = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    ResponderEventPlugin: ResponderEventPlugin,
-    ResponderTouchHistoryStore: ResponderTouchHistoryStore,
-    injectEventPluginsByName: injectEventPluginsByName
-  });
-
-  var unstableNativeDependencies = ReactDOMUnstableNativeDependencies;
-
-  return unstableNativeDependencies;
+  exports.ResponderEventPlugin = ResponderEventPlugin;
+  exports.ResponderTouchHistoryStore = ResponderTouchHistoryStore;
+  exports.injectEventPluginsByName = injectEventPluginsByName;
 
 })));

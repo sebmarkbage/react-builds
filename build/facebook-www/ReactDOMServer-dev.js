@@ -4822,33 +4822,13 @@ function renderToStaticNodeStream() {
       );
     }
   }
-} // Note: when changing this, also consider https://github.com/facebook/react/issues/11526
-
-var ReactDOMServerBrowser = {
-  renderToString: renderToString,
-  renderToStaticMarkup: renderToStaticMarkup,
-  renderToNodeStream: renderToNodeStream,
-  renderToStaticNodeStream: renderToStaticNodeStream,
-  version: ReactVersion
-};
-
-var ReactDOMServerBrowser$1 = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  default: ReactDOMServerBrowser
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
 }
 
-var ReactDOMServer = getCjsExportFromNamespace(ReactDOMServerBrowser$1);
-
-// TODO: decide on the top-level export form.
-// This is hacky but makes it work with both Rollup and Jest
-
-var server_browser = ReactDOMServer.default || ReactDOMServer;
-
-module.exports = server_browser;
+exports.renderToNodeStream = renderToNodeStream;
+exports.renderToStaticMarkup = renderToStaticMarkup;
+exports.renderToStaticNodeStream = renderToStaticNodeStream;
+exports.renderToString = renderToString;
+exports.version = ReactVersion;
 
   })();
 }
