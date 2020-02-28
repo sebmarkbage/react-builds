@@ -2426,23 +2426,18 @@ injectEventPluginsByName({
   ReactNativeBridgeEventPlugin: ReactNativeBridgeEventPlugin
 });
 
-var enableProfilerTimer = true;
-var warnAboutStringRefs = false;
-
 function getInstanceFromInstance(instanceHandle) {
   return instanceHandle;
 }
 
 function getTagFromInstance(inst) {
-  {
-    var tag = inst.stateNode.canonical._nativeTag;
+  var nativeInstance = inst.stateNode.canonical;
 
-    if (!tag) {
-      throw Error("All native instances should have a tag.");
-    }
-
-    return tag;
+  if (!nativeInstance._nativeTag) {
+    throw Error("All native instances should have a tag.");
   }
+
+  return nativeInstance;
 }
 function getFiberCurrentPropsFromNode$1(inst) {
   return inst.canonical.currentProps;
@@ -2716,6 +2711,9 @@ var Incomplete =
 var ShouldCapture =
   /*         */
   4096;
+
+var enableProfilerTimer = true;
+var warnAboutStringRefs = false;
 
 var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
 function getNearestMountedFiber(fiber) {
@@ -3627,8 +3625,12 @@ function dispatchEvent(target, topLevelType, nativeEvent) {
   var targetFiber = target;
   var eventTarget = null;
 
-  {
-    eventTarget = nativeEvent.target;
+  if (targetFiber != null) {
+    var stateNode = targetFiber.stateNode; // Guard against Fiber being unmounted
+
+    if (stateNode != null) {
+      eventTarget = stateNode.canonical;
+    }
   }
 
   batchedUpdates(function() {

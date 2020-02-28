@@ -2425,34 +2425,18 @@ injectEventPluginsByName({
   ReactNativeBridgeEventPlugin: ReactNativeBridgeEventPlugin
 });
 
-// Uncomment to re-export dynamic flags from the fbsource version.
-var _require = require("../shims/ReactFeatureFlags"),
-  enableNativeTargetAsInstance = _require.enableNativeTargetAsInstance; // The rest of the flags are static for better dead code elimination.
-var enableProfilerTimer = true;
-var warnAboutStringRefs = false;
-
 function getInstanceFromInstance(instanceHandle) {
   return instanceHandle;
 }
 
 function getTagFromInstance(inst) {
-  if (enableNativeTargetAsInstance) {
-    var nativeInstance = inst.stateNode.canonical;
+  var nativeInstance = inst.stateNode.canonical;
 
-    if (!nativeInstance._nativeTag) {
-      throw Error("All native instances should have a tag.");
-    }
-
-    return nativeInstance;
-  } else {
-    var tag = inst.stateNode.canonical._nativeTag;
-
-    if (!tag) {
-      throw Error("All native instances should have a tag.");
-    }
-
-    return tag;
+  if (!nativeInstance._nativeTag) {
+    throw Error("All native instances should have a tag.");
   }
+
+  return nativeInstance;
 }
 function getFiberCurrentPropsFromNode$1(inst) {
   return inst.canonical.currentProps;
@@ -2726,6 +2710,9 @@ var Incomplete =
 var ShouldCapture =
   /*         */
   4096;
+
+var enableProfilerTimer = true;
+var warnAboutStringRefs = false;
 
 var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
 function getNearestMountedFiber(fiber) {
@@ -3637,16 +3624,12 @@ function dispatchEvent(target, topLevelType, nativeEvent) {
   var targetFiber = target;
   var eventTarget = null;
 
-  if (enableNativeTargetAsInstance) {
-    if (targetFiber != null) {
-      var stateNode = targetFiber.stateNode; // Guard against Fiber being unmounted
+  if (targetFiber != null) {
+    var stateNode = targetFiber.stateNode; // Guard against Fiber being unmounted
 
-      if (stateNode != null) {
-        eventTarget = stateNode.canonical;
-      }
+    if (stateNode != null) {
+      eventTarget = stateNode.canonical;
     }
-  } else {
-    eventTarget = nativeEvent.target;
   }
 
   batchedUpdates(function() {

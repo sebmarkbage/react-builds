@@ -940,8 +940,6 @@ for (pluginName$jscomp$inline_94 in injectedNamesToPlugins$jscomp$inline_92)
     }
   }
 isOrderingDirty$jscomp$inline_93 && recomputePluginOrdering();
-var enableNativeTargetAsInstance = require("../shims/ReactFeatureFlags")
-  .enableNativeTargetAsInstance;
 function getInstanceFromInstance(instanceHandle) {
   return instanceHandle;
 }
@@ -950,14 +948,8 @@ getFiberCurrentPropsFromNode = function(inst) {
 };
 getInstanceFromNode = getInstanceFromInstance;
 getNodeFromInstance = function(inst) {
-  if (enableNativeTargetAsInstance) {
-    inst = inst.stateNode.canonical;
-    if (!inst._nativeTag)
-      throw Error("All native instances should have a tag.");
-    return inst;
-  }
-  inst = inst.stateNode.canonical._nativeTag;
-  if (!inst) throw Error("All native instances should have a tag.");
+  inst = inst.stateNode.canonical;
+  if (!inst._nativeTag) throw Error("All native instances should have a tag.");
   return inst;
 };
 ResponderEventPlugin.injection.injectGlobalResponderHandler({
@@ -1444,12 +1436,10 @@ function executeDispatchesAndReleaseTopLevel(e) {
 }
 function dispatchEvent(target, topLevelType, nativeEvent) {
   var eventTarget = null;
-  if (enableNativeTargetAsInstance) {
-    if (null != target) {
-      var stateNode = target.stateNode;
-      null != stateNode && (eventTarget = stateNode.canonical);
-    }
-  } else eventTarget = nativeEvent.target;
+  if (null != target) {
+    var stateNode = target.stateNode;
+    null != stateNode && (eventTarget = stateNode.canonical);
+  }
   batchedUpdates(function() {
     var events = eventTarget;
     for (var events$jscomp$0 = null, i = 0; i < plugins.length; i++) {

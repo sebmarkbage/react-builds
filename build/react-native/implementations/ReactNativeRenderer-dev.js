@@ -2426,10 +2426,6 @@ injectEventPluginsByName({
   ReactNativeBridgeEventPlugin: ReactNativeBridgeEventPlugin
 });
 
-var enableProfilerTimer = true;
-var enableFundamentalAPI = false;
-var warnAboutStringRefs = false;
-
 var instanceCache = new Map();
 var instanceProps = new Map();
 function precacheFiberNode(hostInst, tag) {
@@ -2445,19 +2441,19 @@ function getInstanceFromTag(tag) {
 }
 
 function getTagFromInstance(inst) {
-  {
-    var _tag = inst.stateNode._nativeTag;
+  var nativeInstance = inst.stateNode;
+  var tag = nativeInstance._nativeTag;
 
-    if (_tag === undefined) {
-      _tag = inst.stateNode.canonical._nativeTag;
-    }
-
-    if (!_tag) {
-      throw Error("All native instances should have a tag.");
-    }
-
-    return _tag;
+  if (tag === undefined) {
+    nativeInstance = nativeInstance.canonical;
+    tag = nativeInstance._nativeTag;
   }
+
+  if (!tag) {
+    throw Error("All native instances should have a tag.");
+  }
+
+  return nativeInstance;
 }
 function getFiberCurrentPropsFromNode$1(stateNode) {
   return instanceProps.get(stateNode._nativeTag) || null;
@@ -2467,6 +2463,10 @@ function updateFiberProps(tag, props) {
 }
 
 var PLUGIN_EVENT_SYSTEM = 1;
+
+var enableProfilerTimer = true;
+var enableFundamentalAPI = false;
+var warnAboutStringRefs = false;
 
 // the renderer. Such as when we're dispatching events or if third party
 // libraries need to call batchedUpdates. Eventually, this API will go away when
@@ -2631,8 +2631,8 @@ function _receiveRootNodeIDEvent(rootNodeID, topLevelType, nativeEventParam) {
   var inst = getInstanceFromTag(rootNodeID);
   var target = null;
 
-  {
-    target = nativeEvent.target;
+  if (inst != null) {
+    target = inst.stateNode;
   }
 
   batchedUpdates(function() {

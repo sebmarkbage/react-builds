@@ -18277,7 +18277,7 @@ var ReactTestInstance =
         this.findAllByType(type, {
           deep: false
         }),
-        'with node type: "' + (type.displayName || type.name) + '"'
+        'with node type: "' + (getComponentName(type) || "Unknown") + '"'
       );
     };
 

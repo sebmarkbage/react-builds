@@ -15328,7 +15328,7 @@
     _proto.findByType = function findByType(type) {
       return expectOne(this.findAllByType(type, {
         deep: false
-      }), "with node type: \"" + (type.displayName || type.name) + "\"");
+      }), "with node type: \"" + (getComponentName(type) || 'Unknown') + "\"");
     };
 
     _proto.findByProps = function findByProps(props) {

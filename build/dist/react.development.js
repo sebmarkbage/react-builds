@@ -54,93 +54,32 @@
     return null;
   }
 
-  /*
-  object-assign
-  (c) Sindre Sorhus
-  @license MIT
-  */
-  /* eslint-disable no-unused-vars */
-  var getOwnPropertySymbols = Object.getOwnPropertySymbols;
   var hasOwnProperty = Object.prototype.hasOwnProperty;
-  var propIsEnumerable = Object.prototype.propertyIsEnumerable;
 
-  function toObject(val) {
-  	if (val === null || val === undefined) {
-  		throw new TypeError('Object.assign cannot be called with null or undefined');
-  	}
+  var _assign = function (to, from) {
+    for (var key in from) {
+      if (hasOwnProperty.call(from, key)) {
+        to[key] = from[key];
+      }
+    }
+  };
 
-  	return Object(val);
-  }
+  var _assign$1 = Object.assign || function (target, sources) {
+    if (target == null) {
+      throw new TypeError('Object.assign target cannot be null or undefined');
+    }
 
-  function shouldUseNative() {
-  	try {
-  		if (!Object.assign) {
-  			return false;
-  		}
+    var to = Object(target);
 
-  		// Detect buggy property enumeration order in older V8 versions.
+    for (var nextIndex = 1; nextIndex < arguments.length; nextIndex++) {
+      var nextSource = arguments[nextIndex];
 
-  		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
-  		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
-  		test1[5] = 'de';
-  		if (Object.getOwnPropertyNames(test1)[0] === '5') {
-  			return false;
-  		}
+      if (nextSource != null) {
+        _assign(to, Object(nextSource));
+      }
+    }
 
-  		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-  		var test2 = {};
-  		for (var i = 0; i < 10; i++) {
-  			test2['_' + String.fromCharCode(i)] = i;
-  		}
-  		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-  			return test2[n];
-  		});
-  		if (order2.join('') !== '0123456789') {
-  			return false;
-  		}
-
-  		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-  		var test3 = {};
-  		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-  			test3[letter] = letter;
-  		});
-  		if (Object.keys(Object.assign({}, test3)).join('') !==
-  				'abcdefghijklmnopqrst') {
-  			return false;
-  		}
-
-  		return true;
-  	} catch (err) {
-  		// We don't expect any of the above to throw, but better to be safe.
-  		return false;
-  	}
-  }
-
-  var objectAssign = shouldUseNative() ? Object.assign : function (target, source) {
-  	var from;
-  	var to = toObject(target);
-  	var symbols;
-
-  	for (var s = 1; s < arguments.length; s++) {
-  		from = Object(arguments[s]);
-
-  		for (var key in from) {
-  			if (hasOwnProperty.call(from, key)) {
-  				to[key] = from[key];
-  			}
-  		}
-
-  		if (getOwnPropertySymbols) {
-  			symbols = getOwnPropertySymbols(from);
-  			for (var i = 0; i < symbols.length; i++) {
-  				if (propIsEnumerable.call(from, symbols[i])) {
-  					to[symbols[i]] = from[symbols[i]];
-  				}
-  			}
-  		}
-  	}
-
-  	return to;
+    return to;
   };
 
   /**
@@ -338,11 +277,11 @@
     ReactCurrentOwner: ReactCurrentOwner,
     IsSomeRendererActing: IsSomeRendererActing,
     // Used by renderers to avoid bundling object-assign twice in UMD bundles:
-    assign: objectAssign
+    assign: _assign$1
   };
 
   {
-    objectAssign(ReactSharedInternals, {
+    _assign$1(ReactSharedInternals, {
       // These should not be included in production.
       ReactDebugCurrentFrame: ReactDebugCurrentFrame,
       // Shim for React DOM 16.0.0 which still destructured (but not used) this.
@@ -624,7 +563,7 @@
   var pureComponentPrototype = PureComponent.prototype = new ComponentDummy();
   pureComponentPrototype.constructor = PureComponent; // Avoid an extra prototype jump for these methods.
 
-  objectAssign(pureComponentPrototype, Component.prototype);
+  _assign$1(pureComponentPrototype, Component.prototype);
 
   pureComponentPrototype.isPureReactComponent = true;
 
@@ -910,7 +849,7 @@
 
     var propName; // Original props are copied
 
-    var props = objectAssign({}, element.props); // Reserved names are extracted
+    var props = _assign$1({}, element.props); // Reserved names are extracted
 
 
     var key = element.key;
@@ -3229,11 +3168,11 @@
     ReactCurrentOwner: ReactCurrentOwner,
     IsSomeRendererActing: IsSomeRendererActing,
     // Used by renderers to avoid bundling object-assign twice in UMD bundles:
-    assign: objectAssign
+    assign: _assign$1
   };
 
   {
-    objectAssign(ReactSharedInternals$1, {
+    _assign$1(ReactSharedInternals$1, {
       // These should not be included in production.
       ReactDebugCurrentFrame: ReactDebugCurrentFrame,
       // Shim for React DOM 16.0.0 which still destructured (but not used) this.
@@ -3247,7 +3186,7 @@
   // CJS bundles use the shared NPM package.
 
 
-  objectAssign(ReactSharedInternals$1, {
+  _assign$1(ReactSharedInternals$1, {
     Scheduler: Scheduler,
     SchedulerTracing: SchedulerTracing
   });
