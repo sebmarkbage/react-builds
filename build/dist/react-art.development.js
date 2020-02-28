@@ -47,6 +47,7 @@
     return self;
   }
 
+  // TODO: this is special because it gets imported during build.
   var ReactVersion = '16.13.0';
 
   var LegacyRoot = 0;

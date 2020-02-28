@@ -4,8 +4,8 @@
       "filename": "react.development.js",
       "bundleType": "UMD_DEV",
       "packageName": "react",
-      "size": 105898,
-      "gzip": 25992
+      "size": 105964,
+      "gzip": 26020
     },
     {
       "filename": "react.production.min.js",
@@ -25,8 +25,8 @@
       "filename": "react.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react",
-      "size": 65130,
-      "gzip": 17560
+      "size": 65194,
+      "gzip": 17587
     },
     {
       "filename": "react.production.min.js",
@@ -39,8 +39,8 @@
       "filename": "React-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react",
-      "size": 75442,
-      "gzip": 19128
+      "size": 75506,
+      "gzip": 19156
     },
     {
       "filename": "React-prod.js",
@@ -60,8 +60,8 @@
       "filename": "react-dom.development.js",
       "bundleType": "UMD_DEV",
       "packageName": "react-dom",
-      "size": 932253,
-      "gzip": 204025
+      "size": 932319,
+      "gzip": 204054
     },
     {
       "filename": "react-dom.production.min.js",
@@ -81,8 +81,8 @@
       "filename": "react-dom.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-dom",
-      "size": 887453,
-      "gzip": 201556
+      "size": 887517,
+      "gzip": 201587
     },
     {
       "filename": "react-dom.production.min.js",
@@ -102,8 +102,8 @@
       "filename": "ReactDOM-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react-dom",
-      "size": 916540,
-      "gzip": 204902
+      "size": 916604,
+      "gzip": 204934
     },
     {
       "filename": "ReactDOM-prod.js",
@@ -158,8 +158,8 @@
       "filename": "ReactDOMTesting-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react-dom",
-      "size": 891149,
-      "gzip": 199661
+      "size": 891213,
+      "gzip": 199692
     },
     {
       "filename": "ReactDOMTesting-prod.js",
@@ -207,8 +207,8 @@
       "filename": "react-dom-server.browser.development.js",
       "bundleType": "UMD_DEV",
       "packageName": "react-dom",
-      "size": 139343,
-      "gzip": 35595
+      "size": 139409,
+      "gzip": 35615
     },
     {
       "filename": "react-dom-server.browser.production.min.js",
@@ -221,8 +221,8 @@
       "filename": "react-dom-server.browser.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-dom",
-      "size": 132201,
-      "gzip": 35180
+      "size": 132265,
+      "gzip": 35199
     },
     {
       "filename": "react-dom-server.browser.production.min.js",
@@ -235,8 +235,8 @@
       "filename": "ReactDOMServer-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react-dom",
-      "size": 139865,
-      "gzip": 35704
+      "size": 139929,
+      "gzip": 35720
     },
     {
       "filename": "ReactDOMServer-prod.js",
@@ -249,8 +249,8 @@
       "filename": "react-dom-server.node.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-dom",
-      "size": 133448,
-      "gzip": 35443
+      "size": 133512,
+      "gzip": 35462
     },
     {
       "filename": "react-dom-server.node.production.min.js",
@@ -375,8 +375,8 @@
       "filename": "react-art.development.js",
       "bundleType": "UMD_DEV",
       "packageName": "react-art",
-      "size": 647860,
-      "gzip": 136096
+      "size": 647926,
+      "gzip": 136127
     },
     {
       "filename": "react-art.production.min.js",
@@ -389,8 +389,8 @@
       "filename": "react-art.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-art",
-      "size": 549856,
-      "gzip": 118064
+      "size": 549920,
+      "gzip": 118087
     },
     {
       "filename": "react-art.production.min.js",
@@ -403,8 +403,8 @@
       "filename": "ReactART-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react-art",
-      "size": 553245,
-      "gzip": 116097
+      "size": 553309,
+      "gzip": 116121
     },
     {
       "filename": "ReactART-prod.js",
@@ -417,8 +417,8 @@
       "filename": "ReactNativeRenderer-dev.js",
       "bundleType": "RN_FB_DEV",
       "packageName": "react-native-renderer",
-      "size": 649734,
-      "gzip": 140646
+      "size": 649798,
+      "gzip": 140671
     },
     {
       "filename": "ReactNativeRenderer-prod.js",
@@ -438,8 +438,8 @@
       "filename": "ReactNativeRenderer-dev.js",
       "bundleType": "RN_OSS_DEV",
       "packageName": "react-native-renderer",
-      "size": 646313,
-      "gzip": 140106
+      "size": 646377,
+      "gzip": 140131
     },
     {
       "filename": "ReactNativeRenderer-prod.js",
@@ -459,8 +459,8 @@
       "filename": "ReactFabric-dev.js",
       "bundleType": "RN_FB_DEV",
       "packageName": "react-native-renderer",
-      "size": 631335,
-      "gzip": 136269
+      "size": 631399,
+      "gzip": 136293
     },
     {
       "filename": "ReactFabric-prod.js",
@@ -480,8 +480,8 @@
       "filename": "ReactFabric-dev.js",
       "bundleType": "RN_OSS_DEV",
       "packageName": "react-native-renderer",
-      "size": 627896,
-      "gzip": 135717
+      "size": 627960,
+      "gzip": 135740
     },
     {
       "filename": "ReactFabric-prod.js",
@@ -501,8 +501,8 @@
       "filename": "react-test-renderer.development.js",
       "bundleType": "UMD_DEV",
       "packageName": "react-test-renderer",
-      "size": 564067,
-      "gzip": 117452
+      "size": 564133,
+      "gzip": 117481
     },
     {
       "filename": "react-test-renderer.production.min.js",
@@ -515,8 +515,8 @@
       "filename": "react-test-renderer.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-test-renderer",
-      "size": 537578,
-      "gzip": 116072
+      "size": 537642,
+      "gzip": 116097
     },
     {
       "filename": "react-test-renderer.production.min.js",
@@ -529,8 +529,8 @@
       "filename": "ReactTestRenderer-dev.js",
       "bundleType": "FB_WWW_DEV",
       "packageName": "react-test-renderer",
-      "size": 565268,
-      "gzip": 119306
+      "size": 565332,
+      "gzip": 119332
     },
     {
       "filename": "react-test-renderer-shallow.development.js",

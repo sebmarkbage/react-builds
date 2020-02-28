@@ -15,6 +15,7 @@
   (global = global || self, factory(global.React = {}));
 }(this, (function (exports) { 'use strict';
 
+  // TODO: this is special because it gets imported during build.
   var ReactVersion = '16.13.0';
 
   // The Symbol used to tag the ReactElement-like types. If there is no native Symbol

@@ -20051,6 +20051,7 @@ function createPortal(
   };
 }
 
+// TODO: this is special because it gets imported during build.
 var ReactVersion = "16.13.0";
 
 var instanceCache = new Map();
