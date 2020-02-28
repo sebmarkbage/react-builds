@@ -19,7 +19,6 @@ if (__DEV__) {
 var React = require("react");
 require("react-native/Libraries/ReactPrivate/ReactNativePrivateInitializeCore");
 var ReactNativePrivateInterface = require("react-native/Libraries/ReactPrivate/ReactNativePrivateInterface");
-var checkPropTypes = require("prop-types/checkPropTypes");
 var Scheduler = require("scheduler");
 var tracing = require("scheduler/tracing");
 
@@ -3640,7 +3639,11 @@ function dispatchEvent(target, topLevelType, nativeEvent) {
 
   if (enableNativeTargetAsInstance) {
     if (targetFiber != null) {
-      eventTarget = targetFiber.stateNode.canonical;
+      var stateNode = targetFiber.stateNode; // Guard against Fiber being unmounted
+
+      if (stateNode != null) {
+        eventTarget = stateNode.canonical;
+      }
     }
   } else {
     eventTarget = nativeEvent.target;
@@ -3986,120 +3989,77 @@ function finalizeContainerChildren(container, newChildren) {
   completeRoot(container, newChildren);
 }
 
-var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
-function describeComponentFrame(name, source, ownerName) {
-  var sourceInfo = "";
+var loggedTypeFailures = {};
+function checkPropTypes(typeSpecs, values, location, componentName) {
+  {
+    // $FlowFixMe This is okay but Flow doesn't know it.
+    var has = Function.call.bind(Object.prototype.hasOwnProperty);
 
-  if (source) {
-    var path = source.fileName;
-    var fileName = path.replace(BEFORE_SLASH_RE, "");
+    for (var typeSpecName in typeSpecs) {
+      if (has(typeSpecs, typeSpecName)) {
+        var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
+        // fail the render phase where it didn't fail before. So we log it.
+        // After these have been cleaned up, we'll let them throw.
 
-    {
-      // In DEV, include code for a common special case:
-      // prefer "folder/index.js" instead of just "index.js".
-      if (/^index\./.test(fileName)) {
-        var match = path.match(BEFORE_SLASH_RE);
-
-        if (match) {
-          var pathBeforeSlash = match[1];
-
-          if (pathBeforeSlash) {
-            var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, "");
-            fileName = folderName + "/" + fileName;
+        try {
+          // This is intentionally an invariant that gets caught. It's the same
+          // behavior as without this statement except with a better message.
+          if (typeof typeSpecs[typeSpecName] !== "function") {
+            var err = Error(
+              (componentName || "React class") +
+                ": " +
+                location +
+                " type `" +
+                typeSpecName +
+                "` is invalid; " +
+                "it must be a function, usually from the `prop-types` package, but received `" +
+                typeof typeSpecs[typeSpecName] +
+                "`." +
+                "This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`."
+            );
+            err.name = "Invariant Violation";
+            throw err;
           }
+
+          error$1 = typeSpecs[typeSpecName](
+            values,
+            typeSpecName,
+            componentName,
+            location,
+            null,
+            "SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED"
+          );
+        } catch (ex) {
+          error$1 = ex;
+        }
+
+        if (error$1 && !(error$1 instanceof Error)) {
+          error(
+            "%s: type specification of %s" +
+              " `%s` is invalid; the type checker " +
+              "function must return `null` or an `Error` but returned a %s. " +
+              "You may have forgotten to pass an argument to the type checker " +
+              "creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and " +
+              "shape all require an argument).",
+            componentName || "React class",
+            location,
+            typeSpecName,
+            typeof error$1
+          );
+        }
+
+        if (
+          error$1 instanceof Error &&
+          !(error$1.message in loggedTypeFailures)
+        ) {
+          // Only monitor this failure once because there tends to be a lot of the
+          // same error.
+          loggedTypeFailures[error$1.message] = true;
+
+          error("Failed %s type: %s", location, error$1.message);
         }
       }
     }
-
-    sourceInfo = " (at " + fileName + ":" + source.lineNumber + ")";
-  } else if (ownerName) {
-    sourceInfo = " (created by " + ownerName + ")";
-  }
-
-  return "\n    in " + (name || "Unknown") + sourceInfo;
-}
-
-var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-
-function describeFiber(fiber) {
-  switch (fiber.tag) {
-    case HostRoot:
-    case HostPortal:
-    case HostText:
-    case Fragment:
-    case ContextProvider:
-    case ContextConsumer:
-      return "";
-
-    default:
-      var owner = fiber._debugOwner;
-      var source = fiber._debugSource;
-      var name = getComponentName(fiber.type);
-      var ownerName = null;
-
-      if (owner) {
-        ownerName = getComponentName(owner.type);
-      }
-
-      return describeComponentFrame(name, source, ownerName);
-  }
-}
-
-function getStackByFiberInDevAndProd(workInProgress) {
-  var info = "";
-  var node = workInProgress;
-
-  do {
-    info += describeFiber(node);
-    node = node.return;
-  } while (node);
-
-  return info;
-}
-var current = null;
-var phase = null;
-function getCurrentFiberOwnerNameInDevOrNull() {
-  {
-    if (current === null) {
-      return null;
-    }
-
-    var owner = current._debugOwner;
-
-    if (owner !== null && typeof owner !== "undefined") {
-      return getComponentName(owner.type);
-    }
-  }
-
-  return null;
-}
-function getCurrentFiberStackInDev() {
-  {
-    if (current === null) {
-      return "";
-    } // Safe because if current fiber exists, we are reconciling,
-    // and it is guaranteed to be the work-in-progress version.
-
-    return getStackByFiberInDevAndProd(current);
-  }
-}
-function resetCurrentFiber() {
-  {
-    ReactDebugCurrentFrame.getCurrentStack = null;
-    current = null;
-    phase = null;
-  }
-}
-function setCurrentFiber(fiber) {
-  {
-    ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
-    current = fiber;
-    phase = null;
-  }
-}
-function setCurrentPhase(lifeCyclePhase) {
-  {
-    phase = lifeCyclePhase;
   }
 }
 
@@ -4672,13 +4632,7 @@ function getMaskedContext(workInProgress, unmaskedContext) {
 
     {
       var name = getComponentName(type) || "Unknown";
-      checkPropTypes(
-        contextTypes,
-        context,
-        "context",
-        name,
-        getCurrentFiberStackInDev
-      );
+      checkPropTypes(contextTypes, context, "context", name);
     } // Cache unmasked context so we can avoid recreating masked context unless necessary.
     // Context is created before the class component is instantiated so check for instance.
 
@@ -4757,18 +4711,9 @@ function processChildContext(fiber, type, parentContext) {
     }
 
     var childContext;
-
-    {
-      setCurrentPhase("getChildContext");
-    }
-
     startPhaseTimer(fiber, "getChildContext");
     childContext = instance.getChildContext();
     stopPhaseTimer();
-
-    {
-      setCurrentPhase(null);
-    }
 
     for (var contextKey in childContext) {
       if (!(contextKey in childContextTypes)) {
@@ -4783,17 +4728,7 @@ function processChildContext(fiber, type, parentContext) {
 
     {
       var name = getComponentName(type) || "Unknown";
-      checkPropTypes(
-        childContextTypes,
-        childContext,
-        "child context",
-        name, // In practice, there is one case in which we won't get a stack. It's when
-        // somebody calls unstable_renderSubtreeIntoContainer() and we process
-        // context from the parent component instance. The stack will be missing
-        // because it's outside of the reconciliation, and so the pointer has not
-        // been set. This is rare and doesn't matter. We'll also remove that API.
-        getCurrentFiberStackInDev
-      );
+      checkPropTypes(childContextTypes, childContext, "child context", name);
     }
 
     return Object.assign({}, parentContext, {}, childContext);
@@ -5252,6 +5187,123 @@ function shallowEqual(objA, objB) {
   }
 
   return true;
+}
+
+var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
+function describeComponentFrame(name, source, ownerName) {
+  var sourceInfo = "";
+
+  if (source) {
+    var path = source.fileName;
+    var fileName = path.replace(BEFORE_SLASH_RE, "");
+
+    {
+      // In DEV, include code for a common special case:
+      // prefer "folder/index.js" instead of just "index.js".
+      if (/^index\./.test(fileName)) {
+        var match = path.match(BEFORE_SLASH_RE);
+
+        if (match) {
+          var pathBeforeSlash = match[1];
+
+          if (pathBeforeSlash) {
+            var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, "");
+            fileName = folderName + "/" + fileName;
+          }
+        }
+      }
+    }
+
+    sourceInfo = " (at " + fileName + ":" + source.lineNumber + ")";
+  } else if (ownerName) {
+    sourceInfo = " (created by " + ownerName + ")";
+  }
+
+  return "\n    in " + (name || "Unknown") + sourceInfo;
+}
+
+var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+
+function describeFiber(fiber) {
+  switch (fiber.tag) {
+    case HostRoot:
+    case HostPortal:
+    case HostText:
+    case Fragment:
+    case ContextProvider:
+    case ContextConsumer:
+      return "";
+
+    default:
+      var owner = fiber._debugOwner;
+      var source = fiber._debugSource;
+      var name = getComponentName(fiber.type);
+      var ownerName = null;
+
+      if (owner) {
+        ownerName = getComponentName(owner.type);
+      }
+
+      return describeComponentFrame(name, source, ownerName);
+  }
+}
+
+function getStackByFiberInDevAndProd(workInProgress) {
+  var info = "";
+  var node = workInProgress;
+
+  do {
+    info += describeFiber(node);
+    node = node.return;
+  } while (node);
+
+  return info;
+}
+var current = null;
+var isRendering = false;
+function getCurrentFiberOwnerNameInDevOrNull() {
+  {
+    if (current === null) {
+      return null;
+    }
+
+    var owner = current._debugOwner;
+
+    if (owner !== null && typeof owner !== "undefined") {
+      return getComponentName(owner.type);
+    }
+  }
+
+  return null;
+}
+function getCurrentFiberStackInDev() {
+  {
+    if (current === null) {
+      return "";
+    } // Safe because if current fiber exists, we are reconciling,
+    // and it is guaranteed to be the work-in-progress version.
+
+    return getStackByFiberInDevAndProd(current);
+  }
+}
+function resetCurrentFiber() {
+  {
+    ReactDebugCurrentFrame.getCurrentStack = null;
+    current = null;
+    isRendering = false;
+  }
+}
+function setCurrentFiber(fiber) {
+  {
+    ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
+    current = fiber;
+    isRendering = false;
+  }
+}
+function setIsRendering(rendering) {
+  {
+    isRendering = rendering;
+  }
 }
 
 var ReactStrictModeWarnings = {
@@ -11448,7 +11500,6 @@ var didWarnAboutContextTypeOnFunctionComponent;
 var didWarnAboutGetDerivedStateOnFunctionComponent;
 var didWarnAboutFunctionRefs;
 var didWarnAboutReassigningProps;
-var didWarnAboutMaxDuration;
 var didWarnAboutRevealOrder;
 var didWarnAboutTailOptions;
 
@@ -11459,7 +11510,6 @@ var didWarnAboutTailOptions;
   didWarnAboutGetDerivedStateOnFunctionComponent = {};
   didWarnAboutFunctionRefs = {};
   didWarnAboutReassigningProps = false;
-  didWarnAboutMaxDuration = false;
   didWarnAboutRevealOrder = {};
   didWarnAboutTailOptions = {};
 }
@@ -11549,8 +11599,7 @@ function updateForwardRef(
           innerPropTypes,
           nextProps, // Resolved props
           "prop",
-          getComponentName(Component),
-          getCurrentFiberStackInDev
+          getComponentName(Component)
         );
       }
     }
@@ -11564,7 +11613,7 @@ function updateForwardRef(
 
   {
     ReactCurrentOwner$1.current = workInProgress;
-    setCurrentPhase("render");
+    setIsRendering(true);
     nextChildren = renderWithHooks(
       current,
       workInProgress,
@@ -11588,7 +11637,7 @@ function updateForwardRef(
       }
     }
 
-    setCurrentPhase(null);
+    setIsRendering(false);
   }
 
   if (current !== null && !didReceiveUpdate) {
@@ -11661,8 +11710,7 @@ function updateMemoComponent(
           innerPropTypes,
           nextProps, // Resolved props
           "prop",
-          getComponentName(type),
-          getCurrentFiberStackInDev
+          getComponentName(type)
         );
       }
     }
@@ -11692,8 +11740,7 @@ function updateMemoComponent(
         _innerPropTypes,
         nextProps, // Resolved props
         "prop",
-        getComponentName(_type),
-        getCurrentFiberStackInDev
+        getComponentName(_type)
       );
     }
   }
@@ -11756,8 +11803,7 @@ function updateSimpleMemoComponent(
           outerPropTypes,
           nextProps, // Resolved (SimpleMemoComponent has no defaultProps)
           "prop",
-          getComponentName(outerMemoType),
-          getCurrentFiberStackInDev
+          getComponentName(outerMemoType)
         );
       } // Inner propTypes will be validated in the function component path.
     }
@@ -11874,8 +11920,7 @@ function updateFunctionComponent(
           innerPropTypes,
           nextProps, // Resolved props
           "prop",
-          getComponentName(Component),
-          getCurrentFiberStackInDev
+          getComponentName(Component)
         );
       }
     }
@@ -11893,7 +11938,7 @@ function updateFunctionComponent(
 
   {
     ReactCurrentOwner$1.current = workInProgress;
-    setCurrentPhase("render");
+    setIsRendering(true);
     nextChildren = renderWithHooks(
       current,
       workInProgress,
@@ -11917,7 +11962,7 @@ function updateFunctionComponent(
       }
     }
 
-    setCurrentPhase(null);
+    setIsRendering(false);
   }
 
   if (current !== null && !didReceiveUpdate) {
@@ -11957,8 +12002,7 @@ function updateClassComponent(
           innerPropTypes,
           nextProps, // Resolved props
           "prop",
-          getComponentName(Component),
-          getCurrentFiberStackInDev
+          getComponentName(Component)
         );
       }
     }
@@ -12091,14 +12135,14 @@ function finishClassComponent(
     }
   } else {
     {
-      setCurrentPhase("render");
+      setIsRendering(true);
       nextChildren = instance.render();
 
       if (workInProgress.mode & StrictMode) {
         instance.render();
       }
 
-      setCurrentPhase(null);
+      setIsRendering(false);
     }
   } // React DevTools reads this flag.
 
@@ -12356,8 +12400,7 @@ function mountLazyComponent(
               outerPropTypes,
               resolvedProps, // Resolved for outer only
               "prop",
-              getComponentName(Component),
-              getCurrentFiberStackInDev
+              getComponentName(Component)
             );
           }
         }
@@ -12735,20 +12778,7 @@ function updateSuspenseComponent(
   }
 
   suspenseContext = setDefaultShallowSuspenseContext(suspenseContext);
-  pushSuspenseContext(workInProgress, suspenseContext);
-
-  {
-    if ("maxDuration" in nextProps) {
-      if (!didWarnAboutMaxDuration) {
-        didWarnAboutMaxDuration = true;
-
-        error(
-          "maxDuration has been removed from React. " +
-            "Remove the maxDuration prop."
-        );
-      }
-    }
-  } // This next part is a bit confusing. If the children timeout, we switch to
+  pushSuspenseContext(workInProgress, suspenseContext); // This next part is a bit confusing. If the children timeout, we switch to
   // showing the fallback children in place of the "primary" children.
   // However, we don't want to delete the primary children because then their
   // state will be lost (both the React state and the host state, e.g.
@@ -13468,13 +13498,7 @@ function updateContextProvider(current, workInProgress, renderExpirationTime) {
     var providerPropTypes = workInProgress.type.propTypes;
 
     if (providerPropTypes) {
-      checkPropTypes(
-        providerPropTypes,
-        newProps,
-        "prop",
-        "Context.Provider",
-        getCurrentFiberStackInDev
-      );
+      checkPropTypes(providerPropTypes, newProps, "prop", "Context.Provider");
     }
   }
 
@@ -13561,9 +13585,9 @@ function updateContextConsumer(current, workInProgress, renderExpirationTime) {
 
   {
     ReactCurrentOwner$1.current = workInProgress;
-    setCurrentPhase("render");
+    setIsRendering(true);
     newChildren = render(newValue);
-    setCurrentPhase(null);
+    setIsRendering(false);
   } // React DevTools reads this flag.
 
   workInProgress.effectTag |= PerformedWork;
@@ -14024,8 +14048,7 @@ function beginWork(current, workInProgress, renderExpirationTime) {
               outerPropTypes,
               _resolvedProps3, // Resolved for outer only
               "prop",
-              getComponentName(_type2),
-              getCurrentFiberStackInDev
+              getComponentName(_type2)
             );
           }
         }
@@ -15316,7 +15339,7 @@ function commitBeforeMutationLifeCycles(current, finishedWork) {
                   "Expected %s state to match memoized state before " +
                     "getSnapshotBeforeUpdate. " +
                     "This might either be because of a bug in React, or because " +
-                    "a component reassigns its own `this.props`. " +
+                    "a component reassigns its own `this.state`. " +
                     "Please file an issue.",
                   getComponentName(finishedWork.type) || "instance"
                 );
@@ -15518,7 +15541,7 @@ function commitLifeCycles(
                   "Expected %s state to match memoized state before " +
                     "componentDidMount. " +
                     "This might either be because of a bug in React, or because " +
-                    "a component reassigns its own `this.props`. " +
+                    "a component reassigns its own `this.state`. " +
                     "Please file an issue.",
                   getComponentName(finishedWork.type) || "instance"
                 );
@@ -15559,7 +15582,7 @@ function commitLifeCycles(
                   "Expected %s state to match memoized state before " +
                     "componentDidUpdate. " +
                     "This might either be because of a bug in React, or because " +
-                    "a component reassigns its own `this.props`. " +
+                    "a component reassigns its own `this.state`. " +
                     "Please file an issue.",
                   getComponentName(finishedWork.type) || "instance"
                 );
@@ -15600,7 +15623,7 @@ function commitLifeCycles(
                 "Expected %s state to match memoized state before " +
                   "processing the update queue. " +
                   "This might either be because of a bug in React, or because " +
-                  "a component reassigns its own `this.props`. " +
+                  "a component reassigns its own `this.state`. " +
                   "Please file an issue.",
                 getComponentName(finishedWork.type) || "instance"
               );
@@ -18375,7 +18398,6 @@ function pingSuspendedRoot(root, thenable, suspendedTime) {
   } // Mark the time at which this ping was scheduled.
 
   root.lastPingedTime = suspendedTime;
-
   ensureRootIsScheduled(root);
   schedulePendingInteractions(root, suspendedTime);
 }
@@ -18644,7 +18666,6 @@ var beginWork$1;
 }
 
 var didWarnAboutUpdateInRender = false;
-var didWarnAboutUpdateInGetChildContext = false;
 
 function warnAboutRenderPhaseUpdatesInDEV(fiber) {
   {
@@ -18662,35 +18683,16 @@ function warnAboutRenderPhaseUpdatesInDEV(fiber) {
         }
 
         case ClassComponent: {
-          switch (phase) {
-            case "getChildContext":
-              if (didWarnAboutUpdateInGetChildContext) {
-                return;
-              }
+          if (isRendering && !didWarnAboutUpdateInRender) {
+            error(
+              "Cannot update during an existing state transition (such as " +
+                "within `render`). Render methods should be a pure " +
+                "function of props and state."
+            );
 
-              error(
-                "setState(...): Cannot call setState() inside getChildContext()"
-              );
-
-              didWarnAboutUpdateInGetChildContext = true;
-              break;
-
-            case "render":
-              if (didWarnAboutUpdateInRender) {
-                return;
-              }
-
-              error(
-                "Cannot update during an existing state transition (such as " +
-                  "within `render`). Render methods should be a pure " +
-                  "function of props and state."
-              );
-
-              didWarnAboutUpdateInRender = true;
-              break;
+            didWarnAboutUpdateInRender = true;
+            break;
           }
-
-          break;
         }
       }
     }
@@ -19179,6 +19181,19 @@ function createWorkInProgress(current, pendingProps) {
       // But works for yielding (the common case) and should support resuming.
       workInProgress.actualDuration = 0;
       workInProgress.actualStartTime = -1;
+    }
+  }
+
+  {
+    // Trying to debug a mysterious internal-only production failure.
+    // See D20130868 and t62461245.
+    // This is only on for RN FB builds.
+    if (current == null) {
+      throw Error("current is " + current + " but it can't be");
+    }
+
+    if (workInProgress == null) {
+      throw Error("workInProgress is " + workInProgress + " but it can't be");
     }
   }
 
@@ -19851,7 +19866,7 @@ function updateContainer(element, container, parentComponent, callback) {
   }
 
   {
-    if (phase === "render" && current !== null && !didWarnAboutNestedUpdates) {
+    if (isRendering && current !== null && !didWarnAboutNestedUpdates) {
       didWarnAboutNestedUpdates = true;
 
       error(
@@ -20036,7 +20051,7 @@ function createPortal(
   };
 }
 
-var ReactVersion = "16.12.0";
+var ReactVersion = "16.13.0";
 
 var instanceCache = new Map();
 

@@ -90,21 +90,8 @@ function useContextMenu(props) {
   return React.DEPRECATED_useResponder(ContextMenuResponder, props);
 }
 
-var ContextMenu = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  ContextMenuResponder: ContextMenuResponder,
-  useContextMenu: useContextMenu
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var require$$0 = getCjsExportFromNamespace(ContextMenu);
-
-var contextMenu = require$$0;
-
-module.exports = contextMenu;
+exports.ContextMenuResponder = ContextMenuResponder;
+exports.useContextMenu = useContextMenu;
 
   })();
 }

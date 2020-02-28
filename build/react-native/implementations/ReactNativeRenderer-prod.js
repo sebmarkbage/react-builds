@@ -1606,44 +1606,7 @@ function finalizeInitialChildren(parentInstance) {
 }
 var scheduleTimeout = setTimeout,
   cancelTimeout = clearTimeout,
-  BEFORE_SLASH_RE = /^(.*)[\\\/]/;
-function getStackByFiberInDevAndProd(workInProgress) {
-  var info = "";
-  do {
-    a: switch (workInProgress.tag) {
-      case 3:
-      case 4:
-      case 6:
-      case 7:
-      case 10:
-      case 9:
-        var JSCompiler_inline_result = "";
-        break a;
-      default:
-        var owner = workInProgress._debugOwner,
-          source = workInProgress._debugSource,
-          name = getComponentName(workInProgress.type);
-        JSCompiler_inline_result = null;
-        owner && (JSCompiler_inline_result = getComponentName(owner.type));
-        owner = name;
-        name = "";
-        source
-          ? (name =
-              " (at " +
-              source.fileName.replace(BEFORE_SLASH_RE, "") +
-              ":" +
-              source.lineNumber +
-              ")")
-          : JSCompiler_inline_result &&
-            (name = " (created by " + JSCompiler_inline_result + ")");
-        JSCompiler_inline_result = "\n    in " + (owner || "Unknown") + name;
-    }
-    info += JSCompiler_inline_result;
-    workInProgress = workInProgress.return;
-  } while (workInProgress);
-  return info;
-}
-var valueStack = [],
+  valueStack = [],
   index = -1;
 function pop(cursor) {
   0 > index ||
@@ -1870,6 +1833,43 @@ function shallowEqual(objA, objB) {
     )
       return !1;
   return !0;
+}
+var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
+function getStackByFiberInDevAndProd(workInProgress) {
+  var info = "";
+  do {
+    a: switch (workInProgress.tag) {
+      case 3:
+      case 4:
+      case 6:
+      case 7:
+      case 10:
+      case 9:
+        var JSCompiler_inline_result = "";
+        break a;
+      default:
+        var owner = workInProgress._debugOwner,
+          source = workInProgress._debugSource,
+          name = getComponentName(workInProgress.type);
+        JSCompiler_inline_result = null;
+        owner && (JSCompiler_inline_result = getComponentName(owner.type));
+        owner = name;
+        name = "";
+        source
+          ? (name =
+              " (at " +
+              source.fileName.replace(BEFORE_SLASH_RE, "") +
+              ":" +
+              source.lineNumber +
+              ")")
+          : JSCompiler_inline_result &&
+            (name = " (created by " + JSCompiler_inline_result + ")");
+        JSCompiler_inline_result = "\n    in " + (owner || "Unknown") + name;
+    }
+    info += JSCompiler_inline_result;
+    workInProgress = workInProgress.return;
+  } while (workInProgress);
+  return info;
 }
 function resolveDefaultProps(Component, baseProps) {
   if (Component && Component.defaultProps) {
@@ -7583,7 +7583,7 @@ var roots = new Map();
     throw Error("getInspectorDataForViewTag() is not available in production");
   },
   bundleType: 0,
-  version: "16.12.0",
+  version: "16.13.0",
   rendererPackageName: "react-native-renderer"
 });
 exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = {

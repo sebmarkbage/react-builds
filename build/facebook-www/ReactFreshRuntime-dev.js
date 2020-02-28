@@ -625,33 +625,18 @@ function isLikelyComponentType(type) {
   }
 }
 
-var ReactFreshRuntime = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  performReactRefresh: performReactRefresh,
-  register: register,
-  setSignature: setSignature,
-  collectCustomHooksForSignature: collectCustomHooksForSignature,
-  getFamilyByID: getFamilyByID,
-  getFamilyByType: getFamilyByType,
-  findAffectedHostInstances: findAffectedHostInstances,
-  injectIntoGlobalHook: injectIntoGlobalHook,
-  hasUnrecoverableErrors: hasUnrecoverableErrors,
-  _getMountedRootCount: _getMountedRootCount,
-  createSignatureFunctionForTransform: createSignatureFunctionForTransform,
-  isLikelyComponentType: isLikelyComponentType
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var ReactFreshRuntime$1 = getCjsExportFromNamespace(ReactFreshRuntime);
-
-// This is hacky but makes it work with both Rollup and Jest.
-
-var runtime = ReactFreshRuntime$1.default || ReactFreshRuntime$1;
-
-module.exports = runtime;
+exports._getMountedRootCount = _getMountedRootCount;
+exports.collectCustomHooksForSignature = collectCustomHooksForSignature;
+exports.createSignatureFunctionForTransform = createSignatureFunctionForTransform;
+exports.findAffectedHostInstances = findAffectedHostInstances;
+exports.getFamilyByID = getFamilyByID;
+exports.getFamilyByType = getFamilyByType;
+exports.hasUnrecoverableErrors = hasUnrecoverableErrors;
+exports.injectIntoGlobalHook = injectIntoGlobalHook;
+exports.isLikelyComponentType = isLikelyComponentType;
+exports.performReactRefresh = performReactRefresh;
+exports.register = register;
+exports.setSignature = setSignature;
 
   })();
 }

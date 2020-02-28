@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactEventsContextMenu = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactEventsContextMenu = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var DiscreteEvent = 0;
 
@@ -81,14 +81,7 @@
     return React.DEPRECATED_useResponder(ContextMenuResponder, props);
   }
 
-  var ContextMenu = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    ContextMenuResponder: ContextMenuResponder,
-    useContextMenu: useContextMenu
-  });
-
-  var contextMenu = ContextMenu;
-
-  return contextMenu;
+  exports.ContextMenuResponder = ContextMenuResponder;
+  exports.useContextMenu = useContextMenu;
 
 })));

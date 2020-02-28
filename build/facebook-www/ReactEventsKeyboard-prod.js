@@ -104,61 +104,43 @@ function createKeyboardEvent(event, context, type) {
   return keyboardEvent;
 }
 var KeyboardResponder = React.DEPRECATED_createResponder("Keyboard", {
-    targetEventTypes: ["click_active", "keydown_active", "keyup"],
-    targetPortalPropagation: !0,
-    getInitialState: function() {
-      return { isActive: !1 };
-    },
-    onEvent: function(event, context, props, state) {
-      var type = event.type;
-      if (!props.disabled)
-        if ("keydown" === type)
-          (state.isActive = !0),
-            (props = props.onKeyDown),
+  targetEventTypes: ["click_active", "keydown_active", "keyup"],
+  targetPortalPropagation: !0,
+  getInitialState: function() {
+    return { isActive: !1 };
+  },
+  onEvent: function(event, context, props, state) {
+    var type = event.type;
+    if (!props.disabled)
+      if ("keydown" === type)
+        (state.isActive = !0),
+          (props = props.onKeyDown),
+          null != props &&
+            ((event = createKeyboardEvent(event, context, "keyboard:keydown")),
+            context.dispatchEvent(event, props, 0));
+      else {
+        var JSCompiler_temp;
+        if ((JSCompiler_temp = "click" === type))
+          (JSCompiler_temp = event.nativeEvent),
+            (JSCompiler_temp =
+              0 === JSCompiler_temp.mozInputSource && JSCompiler_temp.isTrusted
+                ? !0
+                : 0 === JSCompiler_temp.detail && !JSCompiler_temp.pointerType);
+        JSCompiler_temp
+          ? ((props = props.onClick),
             null != props &&
-              ((event = createKeyboardEvent(
-                event,
-                context,
-                "keyboard:keydown"
-              )),
-              context.dispatchEvent(event, props, 0));
-        else {
-          var JSCompiler_temp;
-          if ((JSCompiler_temp = "click" === type))
-            (JSCompiler_temp = event.nativeEvent),
-              (JSCompiler_temp =
-                0 === JSCompiler_temp.mozInputSource &&
-                JSCompiler_temp.isTrusted
-                  ? !0
-                  : 0 === JSCompiler_temp.detail &&
-                    !JSCompiler_temp.pointerType);
-          JSCompiler_temp
-            ? ((props = props.onClick),
-              null != props &&
-                ((event = createKeyboardEvent(
-                  event,
-                  context,
-                  "keyboard:click"
-                )),
-                context.dispatchEvent(event, props, 0)))
-            : "keyup" === type &&
-              ((state.isActive = !1),
-              (props = props.onKeyUp),
-              null != props &&
-                ((event = createKeyboardEvent(
-                  event,
-                  context,
-                  "keyboard:keyup"
-                )),
-                context.dispatchEvent(event, props, 0)));
-        }
-    }
-  }),
-  Keyboard = {
-    __proto__: null,
-    KeyboardResponder: KeyboardResponder,
-    useKeyboard: function(props) {
-      return React.DEPRECATED_useResponder(KeyboardResponder, props);
-    }
-  };
-module.exports = (Keyboard && Keyboard["default"]) || Keyboard;
+              ((event = createKeyboardEvent(event, context, "keyboard:click")),
+              context.dispatchEvent(event, props, 0)))
+          : "keyup" === type &&
+            ((state.isActive = !1),
+            (props = props.onKeyUp),
+            null != props &&
+              ((event = createKeyboardEvent(event, context, "keyboard:keyup")),
+              context.dispatchEvent(event, props, 0)));
+      }
+  }
+});
+exports.KeyboardResponder = KeyboardResponder;
+exports.useKeyboard = function(props) {
+  return React.DEPRECATED_useResponder(KeyboardResponder, props);
+};

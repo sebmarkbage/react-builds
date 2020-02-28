@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react-dom/server')) :
-  typeof define === 'function' && define.amd ? define(['react-dom/server'], factory) :
-  (global = global || self, global.ReactFlightDOMServer = factory(global.ReactDOMServer));
-}(this, (function (server) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react-dom/server')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react-dom/server'], factory) :
+  (global = global || self, factory(global.ReactFlightDOMServer = {}, global.ReactDOMServer));
+}(this, (function (exports, server) { 'use strict';
 
   function scheduleWork(callback) {
     callback();
@@ -356,16 +356,6 @@
     });
   }
 
-  var ReactFlightDOMServerBrowser = {
-    renderToReadableStream: renderToReadableStream
-  };
-
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest
-
-
-  var server_browser = ReactFlightDOMServerBrowser.default || ReactFlightDOMServerBrowser;
-
-  return server_browser;
+  exports.renderToReadableStream = renderToReadableStream;
 
 })));

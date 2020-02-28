@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactEventsKeyboard = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactEventsKeyboard = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var DiscreteEvent = 0;
 
@@ -207,14 +207,7 @@
     return React.DEPRECATED_useResponder(KeyboardResponder, props);
   }
 
-  var Keyboard = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    KeyboardResponder: KeyboardResponder,
-    useKeyboard: useKeyboard
-  });
-
-  var keyboard = Keyboard;
-
-  return keyboard;
+  exports.KeyboardResponder = KeyboardResponder;
+  exports.useKeyboard = useKeyboard;
 
 })));

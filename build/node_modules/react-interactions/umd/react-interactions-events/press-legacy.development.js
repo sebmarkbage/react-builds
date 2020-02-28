@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactEventsPressLegacy = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactEventsPressLegacy = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
   // Current owner and dispatcher used to share the same ref,
@@ -751,14 +751,7 @@
     return React.DEPRECATED_useResponder(PressResponder, props);
   }
 
-  var PressLegacy = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    PressResponder: PressResponder,
-    usePress: usePress
-  });
-
-  var pressLegacy = PressLegacy;
-
-  return pressLegacy;
+  exports.PressResponder = PressResponder;
+  exports.usePress = usePress;
 
 })));

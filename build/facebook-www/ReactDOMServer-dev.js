@@ -17,7 +17,6 @@ if (__DEV__) {
 "use strict";
 
 var React = require("react");
-var checkPropTypes = require("prop-types/checkPropTypes");
 
 // Do not require this module directly! Use normal `invariant` calls with
 // template literal strings. The messages will be replaced with error codes
@@ -40,7 +39,7 @@ function formatProdErrorMessage(code) {
   );
 }
 
-var ReactVersion = "16.12.0";
+var ReactVersion = "16.13.0";
 
 // This refers to a WWW module.
 var warningWWW = require("warning");
@@ -330,11 +329,83 @@ var _require = require("ReactFeatureFlags"),
   warnAboutSpreadingKeyToJSX = _require.warnAboutSpreadingKeyToJSX; // On WWW, true is used for a new modern build.
 var enableSuspenseServerRenderer = true;
 
-var ReactDebugCurrentFrame;
+var loggedTypeFailures = {};
+function checkPropTypes(typeSpecs, values, location, componentName) {
+  {
+    // $FlowFixMe This is okay but Flow doesn't know it.
+    var has = Function.call.bind(Object.prototype.hasOwnProperty);
+
+    for (var typeSpecName in typeSpecs) {
+      if (has(typeSpecs, typeSpecName)) {
+        var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
+        // fail the render phase where it didn't fail before. So we log it.
+        // After these have been cleaned up, we'll let them throw.
+
+        try {
+          // This is intentionally an invariant that gets caught. It's the same
+          // behavior as without this statement except with a better message.
+          if (typeof typeSpecs[typeSpecName] !== "function") {
+            var err = Error(
+              (componentName || "React class") +
+                ": " +
+                location +
+                " type `" +
+                typeSpecName +
+                "` is invalid; " +
+                "it must be a function, usually from the `prop-types` package, but received `" +
+                typeof typeSpecs[typeSpecName] +
+                "`." +
+                "This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`."
+            );
+            err.name = "Invariant Violation";
+            throw err;
+          }
+
+          error$1 = typeSpecs[typeSpecName](
+            values,
+            typeSpecName,
+            componentName,
+            location,
+            null,
+            "SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED"
+          );
+        } catch (ex) {
+          error$1 = ex;
+        }
+
+        if (error$1 && !(error$1 instanceof Error)) {
+          error(
+            "%s: type specification of %s" +
+              " `%s` is invalid; the type checker " +
+              "function must return `null` or an `Error` but returned a %s. " +
+              "You may have forgotten to pass an argument to the type checker " +
+              "creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and " +
+              "shape all require an argument).",
+            componentName || "React class",
+            location,
+            typeSpecName,
+            typeof error$1
+          );
+        }
+
+        if (
+          error$1 instanceof Error &&
+          !(error$1.message in loggedTypeFailures)
+        ) {
+          // Only monitor this failure once because there tends to be a lot of the
+          // same error.
+          loggedTypeFailures[error$1.message] = true;
+
+          error("Failed %s type: %s", location, error$1.message);
+        }
+      }
+    }
+  }
+}
+
 var didWarnAboutInvalidateContextType;
 
 {
-  ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
   didWarnAboutInvalidateContextType = new Set();
 }
 
@@ -863,7 +934,7 @@ var capitalize = function(token) {
 // or boolean value assignment. Regular attributes that just accept strings
 // and have the same names are omitted, just like in the HTML whitelist.
 // Some of these attributes can be hard to find. This list was created by
-// scrapping the MDN documentation.
+// scraping the MDN documentation.
 
 [
   "accent-height",
@@ -1026,10 +1097,10 @@ properties[xlinkHref] = new PropertyInfoRecord(
   );
 });
 
-var ReactDebugCurrentFrame$1 = null;
+var ReactDebugCurrentFrame = null;
 
 {
-  ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+  ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
 } // A javascript: URL can contain leading C0 control or \u0020 SPACE,
 // and any newline or tab are filtered out as if they're not part of the URL.
 // https://url.spec.whatwg.org/#url-parsing
@@ -1049,7 +1120,7 @@ function sanitizeURL(url) {
       {
         throw Error(
           "React has blocked a javascript: URL as a security precaution." +
-            ReactDebugCurrentFrame$1.getStackAddendum()
+            ReactDebugCurrentFrame.getStackAddendum()
         );
       }
     }
@@ -1721,13 +1792,13 @@ function getChildNamespace(parentNamespace, type) {
   return parentNamespace;
 }
 
-var ReactDebugCurrentFrame$2 = null;
+var ReactDebugCurrentFrame$1 = null;
 var ReactControlledValuePropTypes = {
   checkPropTypes: null
 };
 
 {
-  ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
+  ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
   var hasReadOnlyValue = {
     button: true,
     checkbox: true,
@@ -1787,7 +1858,7 @@ var ReactControlledValuePropTypes = {
       props,
       "prop",
       tagName,
-      ReactDebugCurrentFrame$2.getStackAddendum
+      ReactDebugCurrentFrame$1.getStackAddendum
     );
   };
 }
@@ -1822,10 +1893,10 @@ var voidElementTags = Object.assign(
 );
 
 var HTML = "__html";
-var ReactDebugCurrentFrame$3 = null;
+var ReactDebugCurrentFrame$2 = null;
 
 {
-  ReactDebugCurrentFrame$3 = ReactSharedInternals.ReactDebugCurrentFrame;
+  ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
 }
 
 function assertValidProps(tag, props) {
@@ -1839,7 +1910,7 @@ function assertValidProps(tag, props) {
         throw Error(
           tag +
             " is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`." +
-            ReactDebugCurrentFrame$3.getStackAddendum()
+            ReactDebugCurrentFrame$2.getStackAddendum()
         );
       }
     }
@@ -1887,7 +1958,7 @@ function assertValidProps(tag, props) {
     {
       throw Error(
         "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX." +
-          ReactDebugCurrentFrame$3.getStackAddendum()
+          ReactDebugCurrentFrame$2.getStackAddendum()
       );
     }
   }
@@ -3155,7 +3226,7 @@ var toArray = React.Children.toArray; // This is only used in DEV.
 
 var currentDebugStacks = [];
 var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
-var ReactDebugCurrentFrame$4;
+var ReactDebugCurrentFrame$3;
 var prevGetCurrentStackImpl = null;
 
 var getCurrentServerStackImpl = function() {
@@ -3177,7 +3248,7 @@ var popCurrentDebugStack = function() {};
 var hasWarnedAboutUsingContextAsConsumer = false;
 
 {
-  ReactDebugCurrentFrame$4 = ReactSharedInternals.ReactDebugCurrentFrame;
+  ReactDebugCurrentFrame$3 = ReactSharedInternals.ReactDebugCurrentFrame;
 
   validatePropertiesInDevelopment = function(type, props) {
     validateProperties(type, props);
@@ -3204,8 +3275,8 @@ var hasWarnedAboutUsingContextAsConsumer = false;
     if (currentDebugStacks.length === 1) {
       // We are entering a server renderer.
       // Remember the previous (e.g. client) global stack implementation.
-      prevGetCurrentStackImpl = ReactDebugCurrentFrame$4.getCurrentStack;
-      ReactDebugCurrentFrame$4.getCurrentStack = getCurrentServerStackImpl;
+      prevGetCurrentStackImpl = ReactDebugCurrentFrame$3.getCurrentStack;
+      ReactDebugCurrentFrame$3.getCurrentStack = getCurrentServerStackImpl;
     }
   };
 
@@ -3226,7 +3297,7 @@ var hasWarnedAboutUsingContextAsConsumer = false;
     if (currentDebugStacks.length === 0) {
       // We are exiting the server renderer.
       // Restore the previous (e.g. client) global stack implementation.
-      ReactDebugCurrentFrame$4.getCurrentStack = prevGetCurrentStackImpl;
+      ReactDebugCurrentFrame$3.getCurrentStack = prevGetCurrentStackImpl;
       prevGetCurrentStackImpl = null;
     }
   };

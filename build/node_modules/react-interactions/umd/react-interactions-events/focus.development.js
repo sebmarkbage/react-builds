@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactEventsFocus = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactEventsFocus = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var DiscreteEvent = 0;
 
@@ -528,16 +528,9 @@
     return React.DEPRECATED_useResponder(FocusWithinResponder, props);
   }
 
-  var Focus = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    FocusResponder: FocusResponder,
-    useFocus: useFocus,
-    FocusWithinResponder: FocusWithinResponder,
-    useFocusWithin: useFocusWithin
-  });
-
-  var focus = Focus;
-
-  return focus;
+  exports.FocusResponder = FocusResponder;
+  exports.FocusWithinResponder = FocusWithinResponder;
+  exports.useFocus = useFocus;
+  exports.useFocusWithin = useFocusWithin;
 
 })));

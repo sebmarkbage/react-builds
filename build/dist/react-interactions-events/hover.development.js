@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react')) :
-  typeof define === 'function' && define.amd ? define(['react'], factory) :
-  (global = global || self, global.ReactEventsHover = factory(global.React));
-}(this, (function (React) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react'], factory) :
+  (global = global || self, factory(global.ReactEventsHover = {}, global.React));
+}(this, (function (exports, React) { 'use strict';
 
   var UserBlockingEvent = 1;
 
@@ -310,14 +310,7 @@
     return React.DEPRECATED_useResponder(HoverResponder, props);
   }
 
-  var Hover = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    HoverResponder: HoverResponder,
-    useHover: useHover
-  });
-
-  var hover = Hover;
-
-  return hover;
+  exports.HoverResponder = HoverResponder;
+  exports.useHover = useHover;
 
 })));

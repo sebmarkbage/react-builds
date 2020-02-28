@@ -562,4 +562,4 @@ exports.useState = function(initialState) {
 exports.useTransition = function(config) {
   return resolveDispatcher().useTransition(config);
 };
-exports.version = "16.12.0";
+exports.version = "16.13.0";

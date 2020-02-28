@@ -15,7 +15,7 @@
   (global = global || self, factory(global.React = {}));
 }(this, (function (exports) { 'use strict';
 
-  var ReactVersion = '16.12.0';
+  var ReactVersion = '16.13.0';
 
   // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
   // nor polyfill, then a plain number is used for performance.
@@ -1671,110 +1671,47 @@
     }
   }
 
-  /**
-   * Copyright (c) 2013-present, Facebook, Inc.
-   *
-   * This source code is licensed under the MIT license found in the
-   * LICENSE file in the root directory of this source tree.
-   */
-
-  var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-  var ReactPropTypesSecret_1 = ReactPropTypesSecret;
-
-  var printWarning$1 = function() {};
-
-  {
-    var ReactPropTypesSecret$1 = ReactPropTypesSecret_1;
-    var loggedTypeFailures = {};
-    var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-    printWarning$1 = function(text) {
-      var message = 'Warning: ' + text;
-      if (typeof console !== 'undefined') {
-        console.error(message);
-      }
-      try {
-        // --- Welcome to debugging React ---
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        throw new Error(message);
-      } catch (x) {}
-    };
-  }
-
-  /**
-   * Assert that the values match with the type specs.
-   * Error messages are memorized and will only be shown once.
-   *
-   * @param {object} typeSpecs Map of name to a ReactPropType
-   * @param {object} values Runtime values that need to be type-checked
-   * @param {string} location e.g. "prop", "context", "child context"
-   * @param {string} componentName Name of the component for error messages.
-   * @param {?Function} getStack Returns the component stack.
-   * @private
-   */
-  function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
+  var loggedTypeFailures = {};
+  function checkPropTypes(typeSpecs, values, location, componentName) {
     {
+      // $FlowFixMe This is okay but Flow doesn't know it.
+      var has = Function.call.bind(Object.prototype.hasOwnProperty);
+
       for (var typeSpecName in typeSpecs) {
         if (has(typeSpecs, typeSpecName)) {
-          var error;
-          // Prop type validation may throw. In case they do, we don't want to
+          var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
           // fail the render phase where it didn't fail before. So we log it.
           // After these have been cleaned up, we'll let them throw.
+
           try {
             // This is intentionally an invariant that gets caught. It's the same
             // behavior as without this statement except with a better message.
             if (typeof typeSpecs[typeSpecName] !== 'function') {
-              var err = Error(
-                (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
-                'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.'
-              );
+              var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' + 'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.');
               err.name = 'Invariant Violation';
               throw err;
             }
-            error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret$1);
+
+            error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
           } catch (ex) {
-            error = ex;
+            error$1 = ex;
           }
-          if (error && !(error instanceof Error)) {
-            printWarning$1(
-              (componentName || 'React class') + ': type specification of ' +
-              location + ' `' + typeSpecName + '` is invalid; the type checker ' +
-              'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
-              'You may have forgotten to pass an argument to the type checker ' +
-              'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-              'shape all require an argument).'
-            );
+
+          if (error$1 && !(error$1 instanceof Error)) {
+            error('%s: type specification of %s' + ' `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error$1);
           }
-          if (error instanceof Error && !(error.message in loggedTypeFailures)) {
+
+          if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
             // Only monitor this failure once because there tends to be a lot of the
             // same error.
-            loggedTypeFailures[error.message] = true;
+            loggedTypeFailures[error$1.message] = true;
 
-            var stack = getStack ? getStack() : '';
-
-            printWarning$1(
-              'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
-            );
+            error('Failed %s type: %s', location, error$1.message);
           }
         }
       }
     }
   }
-
-  /**
-   * Resets warning cache when testing.
-   *
-   * @private
-   */
-  checkPropTypes.resetWarningCache = function() {
-    {
-      loggedTypeFailures = {};
-    }
-  };
-
-  var checkPropTypes_1 = checkPropTypes;
 
   var propTypesMisspellWarningShown;
 
@@ -1956,7 +1893,7 @@
 
       if (propTypes) {
         setCurrentlyValidatingElement(element);
-        checkPropTypes_1(propTypes, element.props, 'prop', name, ReactDebugCurrentFrame.getStackAddendum);
+        checkPropTypes(propTypes, element.props, 'prop', name);
         setCurrentlyValidatingElement(null);
       } else if (type.PropTypes !== undefined && !propTypesMisspellWarningShown) {
         propTypesMisspellWarningShown = true;

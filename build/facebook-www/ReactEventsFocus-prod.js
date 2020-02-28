@@ -281,108 +281,104 @@ function dispatchFocusWithinVisibleChangeEvent(context, props, state, value) {
   isFunction(props) && context.dispatchEvent(value, props, 0);
 }
 var FocusWithinResponder = React.DEPRECATED_createResponder("FocusWithin", {
-    targetEventTypes: targetEventTypes,
-    targetPortalPropagation: !0,
-    getInitialState: function() {
-      return {
-        detachedTarget: null,
-        focusTarget: null,
-        isFocused: !1,
-        isFocusVisible: !1,
-        pointerType: ""
-      };
-    },
-    onMount: function() {
-      trackGlobalFocusVisible();
-    },
-    onEvent: function(event, context, props, state) {
-      var type = event.type,
-        relatedTarget = event.nativeEvent.relatedTarget;
-      if (props.disabled)
-        state.isFocused &&
-          (dispatchFocusWithinChangeEvent(context, props, state, !1),
-          (state.isFocused = !1),
-          (state.focusTarget = null));
-      else
-        switch (type) {
-          case "focus":
-            state.focusTarget = context.getResponderNode();
-            state.isFocused ||
-              ((state.isFocused = !0),
-              (state.isFocusVisible = isGlobalFocusVisible),
-              dispatchFocusWithinChangeEvent(context, props, state, !0));
-            !state.isFocusVisible &&
-              isGlobalFocusVisible &&
-              ((state.isFocusVisible = isGlobalFocusVisible),
-              dispatchFocusWithinVisibleChangeEvent(context, props, state, !0));
-            dispatchFocusWithinEvents(context, event, props, state);
-            break;
-          case "blur":
-            state.isFocused &&
-              !context.isTargetWithinResponder(relatedTarget) &&
-              (dispatchFocusWithinChangeEvent(context, props, state, !1),
-              dispatchBlurWithinEvents(context, event, props, state),
-              (state.isFocused = !1));
-            break;
-          case "beforeblur":
-            type = props.onBeforeBlurWithin;
-            isFunction(type)
-              ? ((relatedTarget = createFocusEvent(
-                  context,
-                  "beforeblurwithin",
-                  event.target,
-                  state.pointerType,
-                  !0
-                )),
-                (state.detachedTarget = event.target),
-                context.dispatchEvent(relatedTarget, type, 0),
-                state.addedRootEvents ||
-                  ((state.addedRootEvents = !0),
-                  context.addRootEventTypes(rootEventTypes)))
-              : context.continuePropagation();
-            break;
-          default:
-            handleFocusVisibleTargetEvents(event, context, state, function(
-              isFocusVisible
-            ) {
-              state.isFocused &&
-                state.isFocusVisible !== isFocusVisible &&
-                ((state.isFocusVisible = isFocusVisible),
-                dispatchFocusWithinVisibleChangeEvent(
-                  context,
-                  props,
-                  state,
-                  isFocusVisible
-                ));
-            });
-        }
-    },
-    onRootEvent: function(event, context, props, state) {
-      if ("blur" === event.type) {
-        var detachedTarget = state.detachedTarget;
-        null !== detachedTarget &&
-          detachedTarget === event.target &&
-          (dispatchBlurWithinEvents(context, event, props, state),
-          (state.detachedTarget = null),
-          state.addedRootEvents &&
-            ((state.addedRootEvents = !1),
-            context.removeRootEventTypes(rootEventTypes)));
-      }
-    },
-    onUnmount: function(context, props, state) {
+  targetEventTypes: targetEventTypes,
+  targetPortalPropagation: !0,
+  getInitialState: function() {
+    return {
+      detachedTarget: null,
+      focusTarget: null,
+      isFocused: !1,
+      isFocusVisible: !1,
+      pointerType: ""
+    };
+  },
+  onMount: function() {
+    trackGlobalFocusVisible();
+  },
+  onEvent: function(event, context, props, state) {
+    var type = event.type,
+      relatedTarget = event.nativeEvent.relatedTarget;
+    if (props.disabled)
       state.isFocused &&
-        dispatchFocusWithinChangeEvent(context, props, state, !1);
+        (dispatchFocusWithinChangeEvent(context, props, state, !1),
+        (state.isFocused = !1),
+        (state.focusTarget = null));
+    else
+      switch (type) {
+        case "focus":
+          state.focusTarget = context.getResponderNode();
+          state.isFocused ||
+            ((state.isFocused = !0),
+            (state.isFocusVisible = isGlobalFocusVisible),
+            dispatchFocusWithinChangeEvent(context, props, state, !0));
+          !state.isFocusVisible &&
+            isGlobalFocusVisible &&
+            ((state.isFocusVisible = isGlobalFocusVisible),
+            dispatchFocusWithinVisibleChangeEvent(context, props, state, !0));
+          dispatchFocusWithinEvents(context, event, props, state);
+          break;
+        case "blur":
+          state.isFocused &&
+            !context.isTargetWithinResponder(relatedTarget) &&
+            (dispatchFocusWithinChangeEvent(context, props, state, !1),
+            dispatchBlurWithinEvents(context, event, props, state),
+            (state.isFocused = !1));
+          break;
+        case "beforeblur":
+          type = props.onBeforeBlurWithin;
+          isFunction(type)
+            ? ((relatedTarget = createFocusEvent(
+                context,
+                "beforeblurwithin",
+                event.target,
+                state.pointerType,
+                !0
+              )),
+              (state.detachedTarget = event.target),
+              context.dispatchEvent(relatedTarget, type, 0),
+              state.addedRootEvents ||
+                ((state.addedRootEvents = !0),
+                context.addRootEventTypes(rootEventTypes)))
+            : context.continuePropagation();
+          break;
+        default:
+          handleFocusVisibleTargetEvents(event, context, state, function(
+            isFocusVisible
+          ) {
+            state.isFocused &&
+              state.isFocusVisible !== isFocusVisible &&
+              ((state.isFocusVisible = isFocusVisible),
+              dispatchFocusWithinVisibleChangeEvent(
+                context,
+                props,
+                state,
+                isFocusVisible
+              ));
+          });
+      }
+  },
+  onRootEvent: function(event, context, props, state) {
+    if ("blur" === event.type) {
+      var detachedTarget = state.detachedTarget;
+      null !== detachedTarget &&
+        detachedTarget === event.target &&
+        (dispatchBlurWithinEvents(context, event, props, state),
+        (state.detachedTarget = null),
+        state.addedRootEvents &&
+          ((state.addedRootEvents = !1),
+          context.removeRootEventTypes(rootEventTypes)));
     }
-  }),
-  Focus = {
-    __proto__: null,
-    FocusResponder: FocusResponder,
-    useFocus: function(props) {
-      return React.DEPRECATED_useResponder(FocusResponder, props);
-    },
-    FocusWithinResponder: FocusWithinResponder,
-    useFocusWithin: function(props) {
-      return React.DEPRECATED_useResponder(FocusWithinResponder, props);
-    }
-  };
-module.exports = (Focus && Focus["default"]) || Focus;
+  },
+  onUnmount: function(context, props, state) {
+    state.isFocused &&
+      dispatchFocusWithinChangeEvent(context, props, state, !1);
+  }
+});
+exports.FocusResponder = FocusResponder;
+exports.FocusWithinResponder = FocusWithinResponder;
+exports.useFocus = function(props) {
+  return React.DEPRECATED_useResponder(FocusResponder, props);
+};
+exports.useFocusWithin = function(props) {
+  return React.DEPRECATED_useResponder(FocusWithinResponder, props);
+};

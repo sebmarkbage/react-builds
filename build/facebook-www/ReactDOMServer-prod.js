@@ -1414,4 +1414,4 @@ exports.renderToString = function(element) {
     element.destroy();
   }
 };
-exports.version = "16.12.0";
+exports.version = "16.13.0";

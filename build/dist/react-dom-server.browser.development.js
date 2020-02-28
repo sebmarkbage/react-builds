@@ -28,7 +28,7 @@
     return "Minified React error #" + code + "; visit " + url + " for the full message or " + 'use the non-minified dev environment for full errors and additional ' + 'helpful warnings.';
   }
 
-  var ReactVersion = '16.12.0';
+  var ReactVersion = '16.13.0';
 
   var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
   // Current owner and dispatcher used to share the same ref,
@@ -282,116 +282,51 @@
 
   var enableDeprecatedFlareAPI = false; // Experimental Host Component support.
 
-  /**
-   * Copyright (c) 2013-present, Facebook, Inc.
-   *
-   * This source code is licensed under the MIT license found in the
-   * LICENSE file in the root directory of this source tree.
-   */
-
-  var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-  var ReactPropTypesSecret_1 = ReactPropTypesSecret;
-
-  var printWarning$1 = function() {};
-
-  {
-    var ReactPropTypesSecret$1 = ReactPropTypesSecret_1;
-    var loggedTypeFailures = {};
-    var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-    printWarning$1 = function(text) {
-      var message = 'Warning: ' + text;
-      if (typeof console !== 'undefined') {
-        console.error(message);
-      }
-      try {
-        // --- Welcome to debugging React ---
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        throw new Error(message);
-      } catch (x) {}
-    };
-  }
-
-  /**
-   * Assert that the values match with the type specs.
-   * Error messages are memorized and will only be shown once.
-   *
-   * @param {object} typeSpecs Map of name to a ReactPropType
-   * @param {object} values Runtime values that need to be type-checked
-   * @param {string} location e.g. "prop", "context", "child context"
-   * @param {string} componentName Name of the component for error messages.
-   * @param {?Function} getStack Returns the component stack.
-   * @private
-   */
-  function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
+  var loggedTypeFailures = {};
+  function checkPropTypes(typeSpecs, values, location, componentName) {
     {
+      // $FlowFixMe This is okay but Flow doesn't know it.
+      var has = Function.call.bind(Object.prototype.hasOwnProperty);
+
       for (var typeSpecName in typeSpecs) {
         if (has(typeSpecs, typeSpecName)) {
-          var error;
-          // Prop type validation may throw. In case they do, we don't want to
+          var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
           // fail the render phase where it didn't fail before. So we log it.
           // After these have been cleaned up, we'll let them throw.
+
           try {
             // This is intentionally an invariant that gets caught. It's the same
             // behavior as without this statement except with a better message.
             if (typeof typeSpecs[typeSpecName] !== 'function') {
-              var err = Error(
-                (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
-                'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.'
-              );
+              var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' + 'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.');
               err.name = 'Invariant Violation';
               throw err;
             }
-            error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret$1);
+
+            error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
           } catch (ex) {
-            error = ex;
+            error$1 = ex;
           }
-          if (error && !(error instanceof Error)) {
-            printWarning$1(
-              (componentName || 'React class') + ': type specification of ' +
-              location + ' `' + typeSpecName + '` is invalid; the type checker ' +
-              'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
-              'You may have forgotten to pass an argument to the type checker ' +
-              'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-              'shape all require an argument).'
-            );
+
+          if (error$1 && !(error$1 instanceof Error)) {
+            error('%s: type specification of %s' + ' `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error$1);
           }
-          if (error instanceof Error && !(error.message in loggedTypeFailures)) {
+
+          if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
             // Only monitor this failure once because there tends to be a lot of the
             // same error.
-            loggedTypeFailures[error.message] = true;
+            loggedTypeFailures[error$1.message] = true;
 
-            var stack = getStack ? getStack() : '';
-
-            printWarning$1(
-              'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
-            );
+            error('Failed %s type: %s', location, error$1.message);
           }
         }
       }
     }
   }
 
-  /**
-   * Resets warning cache when testing.
-   *
-   * @private
-   */
-  checkPropTypes.resetWarningCache = function() {
-    {
-      loggedTypeFailures = {};
-    }
-  };
-
-  var checkPropTypes_1 = checkPropTypes;
-
-  var ReactDebugCurrentFrame;
   var didWarnAboutInvalidateContextType;
 
   {
-    ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
     didWarnAboutInvalidateContextType = new Set();
   }
 
@@ -419,7 +354,7 @@
 
   function checkContextTypes(typeSpecs, values, location) {
     {
-      checkPropTypes_1(typeSpecs, values, location, 'Component', ReactDebugCurrentFrame.getCurrentStack);
+      checkPropTypes(typeSpecs, values, location, 'Component');
     }
   }
 
@@ -798,7 +733,7 @@
   // or boolean value assignment. Regular attributes that just accept strings
   // and have the same names are omitted, just like in the HTML whitelist.
   // Some of these attributes can be hard to find. This list was created by
-  // scrapping the MDN documentation.
+  // scraping the MDN documentation.
 
 
   ['accent-height', 'alignment-baseline', 'arabic-form', 'baseline-shift', 'cap-height', 'clip-path', 'clip-rule', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'dominant-baseline', 'enable-background', 'fill-opacity', 'fill-rule', 'flood-color', 'flood-opacity', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-name', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'horiz-adv-x', 'horiz-origin-x', 'image-rendering', 'letter-spacing', 'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'overline-position', 'overline-thickness', 'paint-order', 'panose-1', 'pointer-events', 'rendering-intent', 'shape-rendering', 'stop-color', 'stop-opacity', 'strikethrough-position', 'strikethrough-thickness', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'underline-position', 'underline-thickness', 'unicode-bidi', 'unicode-range', 'units-per-em', 'v-alphabetic', 'v-hanging', 'v-ideographic', 'v-mathematical', 'vector-effect', 'vert-adv-y', 'vert-origin-x', 'vert-origin-y', 'word-spacing', 'writing-mode', 'xmlns:xlink', 'x-height' // NOTE: if you add a camelCased prop to this list,
@@ -849,10 +784,10 @@
     true);
   });
 
-  var ReactDebugCurrentFrame$1 = null;
+  var ReactDebugCurrentFrame = null;
 
   {
-    ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
   } // A javascript: URL can contain leading C0 control or \u0020 SPACE,
   // and any newline or tab are filtered out as if they're not part of the URL.
   // https://url.spec.whatwg.org/#url-parsing
@@ -1505,13 +1440,13 @@
     return parentNamespace;
   }
 
-  var ReactDebugCurrentFrame$2 = null;
+  var ReactDebugCurrentFrame$1 = null;
   var ReactControlledValuePropTypes = {
     checkPropTypes: null
   };
 
   {
-    ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
     var hasReadOnlyValue = {
       button: true,
       checkbox: true,
@@ -1543,7 +1478,7 @@
      */
 
     ReactControlledValuePropTypes.checkPropTypes = function (tagName, props) {
-      checkPropTypes_1(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$2.getStackAddendum);
+      checkPropTypes(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$1.getStackAddendum);
     };
   }
 
@@ -1575,10 +1510,10 @@
   }, omittedCloseTags);
 
   var HTML = '__html';
-  var ReactDebugCurrentFrame$3 = null;
+  var ReactDebugCurrentFrame$2 = null;
 
   {
-    ReactDebugCurrentFrame$3 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
   }
 
   function assertValidProps(tag, props) {
@@ -1590,7 +1525,7 @@
     if (voidElementTags[tag]) {
       if (!(props.children == null && props.dangerouslySetInnerHTML == null)) {
         {
-          throw Error( tag + " is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`." + ( ReactDebugCurrentFrame$3.getStackAddendum() ) );
+          throw Error( tag + " is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`." + ( ReactDebugCurrentFrame$2.getStackAddendum() ) );
         }
       }
     }
@@ -1617,7 +1552,7 @@
 
     if (!(props.style == null || typeof props.style === 'object')) {
       {
-        throw Error( "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX." + ( ReactDebugCurrentFrame$3.getStackAddendum() ) );
+        throw Error( "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX." + ( ReactDebugCurrentFrame$2.getStackAddendum() ) );
       }
     }
   }
@@ -2720,7 +2655,7 @@
 
   var currentDebugStacks = [];
   var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
-  var ReactDebugCurrentFrame$4;
+  var ReactDebugCurrentFrame$3;
   var prevGetCurrentStackImpl = null;
 
   var getCurrentServerStackImpl = function () {
@@ -2742,7 +2677,7 @@
   var hasWarnedAboutUsingContextAsConsumer = false;
 
   {
-    ReactDebugCurrentFrame$4 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame$3 = ReactSharedInternals.ReactDebugCurrentFrame;
 
     validatePropertiesInDevelopment = function (type, props) {
       validateProperties(type, props);
@@ -2766,8 +2701,8 @@
       if (currentDebugStacks.length === 1) {
         // We are entering a server renderer.
         // Remember the previous (e.g. client) global stack implementation.
-        prevGetCurrentStackImpl = ReactDebugCurrentFrame$4.getCurrentStack;
-        ReactDebugCurrentFrame$4.getCurrentStack = getCurrentServerStackImpl;
+        prevGetCurrentStackImpl = ReactDebugCurrentFrame$3.getCurrentStack;
+        ReactDebugCurrentFrame$3.getCurrentStack = getCurrentServerStackImpl;
       }
     };
 
@@ -2788,7 +2723,7 @@
       if (currentDebugStacks.length === 0) {
         // We are exiting the server renderer.
         // Restore the previous (e.g. client) global stack implementation.
-        ReactDebugCurrentFrame$4.getCurrentStack = prevGetCurrentStackImpl;
+        ReactDebugCurrentFrame$3.getCurrentStack = prevGetCurrentStackImpl;
         prevGetCurrentStackImpl = null;
       }
     };

@@ -219,21 +219,8 @@ function useKeyboard(props) {
   return React.DEPRECATED_useResponder(KeyboardResponder, props);
 }
 
-var Keyboard = /*#__PURE__*/ Object.freeze({
-  __proto__: null,
-  KeyboardResponder: KeyboardResponder,
-  useKeyboard: useKeyboard
-});
-
-function getCjsExportFromNamespace(n) {
-  return (n && n["default"]) || n;
-}
-
-var require$$0 = getCjsExportFromNamespace(Keyboard);
-
-var keyboard = require$$0;
-
-module.exports = keyboard;
+exports.KeyboardResponder = KeyboardResponder;
+exports.useKeyboard = useKeyboard;
 
   })();
 }

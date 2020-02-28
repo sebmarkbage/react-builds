@@ -10,10 +10,10 @@
 'use strict';
 
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global.ReactFlightDOMClient = factory());
-}(this, (function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = global || self, factory(global.ReactFlightDOMClient = {}));
+}(this, (function (exports) { 'use strict';
 
   function createStringDecoder() {
     return new TextDecoder();
@@ -327,18 +327,8 @@
     return getModelRoot(response);
   }
 
-  var ReactFlightDOMClient = {
-    readFromXHR: readFromXHR,
-    readFromFetch: readFromFetch,
-    readFromReadableStream: readFromReadableStream
-  };
-
-  // TODO: decide on the top-level export form.
-  // This is hacky but makes it work with both Rollup and Jest
-
-
-  var reactFlightDomWebpack = ReactFlightDOMClient.default || ReactFlightDOMClient;
-
-  return reactFlightDomWebpack;
+  exports.readFromFetch = readFromFetch;
+  exports.readFromReadableStream = readFromReadableStream;
+  exports.readFromXHR = readFromXHR;
 
 })));

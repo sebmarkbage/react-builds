@@ -439,271 +439,6 @@
   var ScopeComponent = 21;
   var Block = 22;
 
-  var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
-  function describeComponentFrame (name, source, ownerName) {
-    var sourceInfo = '';
-
-    if (source) {
-      var path = source.fileName;
-      var fileName = path.replace(BEFORE_SLASH_RE, '');
-
-      {
-        // In DEV, include code for a common special case:
-        // prefer "folder/index.js" instead of just "index.js".
-        if (/^index\./.test(fileName)) {
-          var match = path.match(BEFORE_SLASH_RE);
-
-          if (match) {
-            var pathBeforeSlash = match[1];
-
-            if (pathBeforeSlash) {
-              var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, '');
-              fileName = folderName + '/' + fileName;
-            }
-          }
-        }
-      }
-
-      sourceInfo = ' (at ' + fileName + ':' + source.lineNumber + ')';
-    } else if (ownerName) {
-      sourceInfo = ' (created by ' + ownerName + ')';
-    }
-
-    return '\n    in ' + (name || 'Unknown') + sourceInfo;
-  }
-
-  // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
-  // nor polyfill, then a plain number is used for performance.
-  var hasSymbol = typeof Symbol === 'function' && Symbol.for;
-  var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for('react.element') : 0xeac7;
-  var REACT_PORTAL_TYPE = hasSymbol ? Symbol.for('react.portal') : 0xeaca;
-  var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for('react.fragment') : 0xeacb;
-  var REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for('react.strict_mode') : 0xeacc;
-  var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for('react.profiler') : 0xead2;
-  var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for('react.provider') : 0xeacd;
-  var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-  var REACT_CONCURRENT_MODE_TYPE = hasSymbol ? Symbol.for('react.concurrent_mode') : 0xeacf;
-  var REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for('react.forward_ref') : 0xead0;
-  var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for('react.suspense') : 0xead1;
-  var REACT_SUSPENSE_LIST_TYPE = hasSymbol ? Symbol.for('react.suspense_list') : 0xead8;
-  var REACT_MEMO_TYPE = hasSymbol ? Symbol.for('react.memo') : 0xead3;
-  var REACT_LAZY_TYPE = hasSymbol ? Symbol.for('react.lazy') : 0xead4;
-  var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for('react.block') : 0xead9;
-  var MAYBE_ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
-  var FAUX_ITERATOR_SYMBOL = '@@iterator';
-  function getIteratorFn(maybeIterable) {
-    if (maybeIterable === null || typeof maybeIterable !== 'object') {
-      return null;
-    }
-
-    var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
-
-    if (typeof maybeIterator === 'function') {
-      return maybeIterator;
-    }
-
-    return null;
-  }
-
-  var Uninitialized = -1;
-  var Pending = 0;
-  var Resolved = 1;
-  var Rejected = 2;
-  function refineResolvedLazyComponent(lazyComponent) {
-    return lazyComponent._status === Resolved ? lazyComponent._result : null;
-  }
-  function initializeLazyComponentType(lazyComponent) {
-    if (lazyComponent._status === Uninitialized) {
-      lazyComponent._status = Pending;
-      var ctor = lazyComponent._ctor;
-      var thenable = ctor();
-      lazyComponent._result = thenable;
-      thenable.then(function (moduleObject) {
-        if (lazyComponent._status === Pending) {
-          var defaultExport = moduleObject.default;
-
-          {
-            if (defaultExport === undefined) {
-              error('lazy: Expected the result of a dynamic import() call. ' + 'Instead received: %s\n\nYour code should look like: \n  ' + "const MyComponent = lazy(() => import('./MyComponent'))", moduleObject);
-            }
-          }
-
-          lazyComponent._status = Resolved;
-          lazyComponent._result = defaultExport;
-        }
-      }, function (error) {
-        if (lazyComponent._status === Pending) {
-          lazyComponent._status = Rejected;
-          lazyComponent._result = error;
-        }
-      });
-    }
-  }
-
-  function getWrappedName(outerType, innerType, wrapperName) {
-    var functionName = innerType.displayName || innerType.name || '';
-    return outerType.displayName || (functionName !== '' ? wrapperName + "(" + functionName + ")" : wrapperName);
-  }
-
-  function getComponentName(type) {
-    if (type == null) {
-      // Host root, text node or just invalid type.
-      return null;
-    }
-
-    {
-      if (typeof type.tag === 'number') {
-        error('Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
-      }
-    }
-
-    if (typeof type === 'function') {
-      return type.displayName || type.name || null;
-    }
-
-    if (typeof type === 'string') {
-      return type;
-    }
-
-    switch (type) {
-      case REACT_FRAGMENT_TYPE:
-        return 'Fragment';
-
-      case REACT_PORTAL_TYPE:
-        return 'Portal';
-
-      case REACT_PROFILER_TYPE:
-        return "Profiler";
-
-      case REACT_STRICT_MODE_TYPE:
-        return 'StrictMode';
-
-      case REACT_SUSPENSE_TYPE:
-        return 'Suspense';
-
-      case REACT_SUSPENSE_LIST_TYPE:
-        return 'SuspenseList';
-    }
-
-    if (typeof type === 'object') {
-      switch (type.$$typeof) {
-        case REACT_CONTEXT_TYPE:
-          return 'Context.Consumer';
-
-        case REACT_PROVIDER_TYPE:
-          return 'Context.Provider';
-
-        case REACT_FORWARD_REF_TYPE:
-          return getWrappedName(type, type.render, 'ForwardRef');
-
-        case REACT_MEMO_TYPE:
-          return getComponentName(type.type);
-
-        case REACT_BLOCK_TYPE:
-          return getComponentName(type.render);
-
-        case REACT_LAZY_TYPE:
-          {
-            var thenable = type;
-            var resolvedThenable = refineResolvedLazyComponent(thenable);
-
-            if (resolvedThenable) {
-              return getComponentName(resolvedThenable);
-            }
-
-            break;
-          }
-      }
-    }
-
-    return null;
-  }
-
-  var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-
-  function describeFiber(fiber) {
-    switch (fiber.tag) {
-      case HostRoot:
-      case HostPortal:
-      case HostText:
-      case Fragment:
-      case ContextProvider:
-      case ContextConsumer:
-        return '';
-
-      default:
-        var owner = fiber._debugOwner;
-        var source = fiber._debugSource;
-        var name = getComponentName(fiber.type);
-        var ownerName = null;
-
-        if (owner) {
-          ownerName = getComponentName(owner.type);
-        }
-
-        return describeComponentFrame(name, source, ownerName);
-    }
-  }
-
-  function getStackByFiberInDevAndProd(workInProgress) {
-    var info = '';
-    var node = workInProgress;
-
-    do {
-      info += describeFiber(node);
-      node = node.return;
-    } while (node);
-
-    return info;
-  }
-  var current = null;
-  var phase = null;
-  function getCurrentFiberOwnerNameInDevOrNull() {
-    {
-      if (current === null) {
-        return null;
-      }
-
-      var owner = current._debugOwner;
-
-      if (owner !== null && typeof owner !== 'undefined') {
-        return getComponentName(owner.type);
-      }
-    }
-
-    return null;
-  }
-  function getCurrentFiberStackInDev() {
-    {
-      if (current === null) {
-        return '';
-      } // Safe because if current fiber exists, we are reconciling,
-      // and it is guaranteed to be the work-in-progress version.
-
-
-      return getStackByFiberInDevAndProd(current);
-    }
-  }
-  function resetCurrentFiber() {
-    {
-      ReactDebugCurrentFrame.getCurrentStack = null;
-      current = null;
-      phase = null;
-    }
-  }
-  function setCurrentFiber(fiber) {
-    {
-      ReactDebugCurrentFrame.getCurrentStack = getCurrentFiberStackInDev;
-      current = fiber;
-      phase = null;
-    }
-  }
-  function setCurrentPhase(lifeCyclePhase) {
-    {
-      phase = lifeCyclePhase;
-    }
-  }
-
   /**
    * Injectable ordering of event plugins.
    */
@@ -1376,7 +1111,7 @@
   // or boolean value assignment. Regular attributes that just accept strings
   // and have the same names are omitted, just like in the HTML whitelist.
   // Some of these attributes can be hard to find. This list was created by
-  // scrapping the MDN documentation.
+  // scraping the MDN documentation.
 
 
   ['accent-height', 'alignment-baseline', 'arabic-form', 'baseline-shift', 'cap-height', 'clip-path', 'clip-rule', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'dominant-baseline', 'enable-background', 'fill-opacity', 'fill-rule', 'flood-color', 'flood-opacity', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-name', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'horiz-adv-x', 'horiz-origin-x', 'image-rendering', 'letter-spacing', 'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'overline-position', 'overline-thickness', 'paint-order', 'panose-1', 'pointer-events', 'rendering-intent', 'shape-rendering', 'stop-color', 'stop-opacity', 'strikethrough-position', 'strikethrough-thickness', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'underline-position', 'underline-thickness', 'unicode-bidi', 'unicode-range', 'units-per-em', 'v-alphabetic', 'v-hanging', 'v-ideographic', 'v-mathematical', 'vector-effect', 'vert-adv-y', 'vert-origin-x', 'vert-origin-y', 'word-spacing', 'writing-mode', 'xmlns:xlink', 'x-height' // NOTE: if you add a camelCased prop to this list,
@@ -1427,10 +1162,10 @@
     true);
   });
 
-  var ReactDebugCurrentFrame$1 = null;
+  var ReactDebugCurrentFrame = null;
 
   {
-    ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+    ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
   } // A javascript: URL can contain leading C0 control or \u0020 SPACE,
   // and any newline or tab are filtered out as if they're not part of the URL.
   // https://url.spec.whatwg.org/#url-parsing
@@ -1635,6 +1370,271 @@
     }
   }
 
+  var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
+  function describeComponentFrame (name, source, ownerName) {
+    var sourceInfo = '';
+
+    if (source) {
+      var path = source.fileName;
+      var fileName = path.replace(BEFORE_SLASH_RE, '');
+
+      {
+        // In DEV, include code for a common special case:
+        // prefer "folder/index.js" instead of just "index.js".
+        if (/^index\./.test(fileName)) {
+          var match = path.match(BEFORE_SLASH_RE);
+
+          if (match) {
+            var pathBeforeSlash = match[1];
+
+            if (pathBeforeSlash) {
+              var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, '');
+              fileName = folderName + '/' + fileName;
+            }
+          }
+        }
+      }
+
+      sourceInfo = ' (at ' + fileName + ':' + source.lineNumber + ')';
+    } else if (ownerName) {
+      sourceInfo = ' (created by ' + ownerName + ')';
+    }
+
+    return '\n    in ' + (name || 'Unknown') + sourceInfo;
+  }
+
+  // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
+  // nor polyfill, then a plain number is used for performance.
+  var hasSymbol = typeof Symbol === 'function' && Symbol.for;
+  var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for('react.element') : 0xeac7;
+  var REACT_PORTAL_TYPE = hasSymbol ? Symbol.for('react.portal') : 0xeaca;
+  var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for('react.fragment') : 0xeacb;
+  var REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for('react.strict_mode') : 0xeacc;
+  var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for('react.profiler') : 0xead2;
+  var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for('react.provider') : 0xeacd;
+  var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
+  var REACT_CONCURRENT_MODE_TYPE = hasSymbol ? Symbol.for('react.concurrent_mode') : 0xeacf;
+  var REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for('react.forward_ref') : 0xead0;
+  var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for('react.suspense') : 0xead1;
+  var REACT_SUSPENSE_LIST_TYPE = hasSymbol ? Symbol.for('react.suspense_list') : 0xead8;
+  var REACT_MEMO_TYPE = hasSymbol ? Symbol.for('react.memo') : 0xead3;
+  var REACT_LAZY_TYPE = hasSymbol ? Symbol.for('react.lazy') : 0xead4;
+  var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for('react.block') : 0xead9;
+  var MAYBE_ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
+  var FAUX_ITERATOR_SYMBOL = '@@iterator';
+  function getIteratorFn(maybeIterable) {
+    if (maybeIterable === null || typeof maybeIterable !== 'object') {
+      return null;
+    }
+
+    var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
+
+    if (typeof maybeIterator === 'function') {
+      return maybeIterator;
+    }
+
+    return null;
+  }
+
+  var Uninitialized = -1;
+  var Pending = 0;
+  var Resolved = 1;
+  var Rejected = 2;
+  function refineResolvedLazyComponent(lazyComponent) {
+    return lazyComponent._status === Resolved ? lazyComponent._result : null;
+  }
+  function initializeLazyComponentType(lazyComponent) {
+    if (lazyComponent._status === Uninitialized) {
+      lazyComponent._status = Pending;
+      var ctor = lazyComponent._ctor;
+      var thenable = ctor();
+      lazyComponent._result = thenable;
+      thenable.then(function (moduleObject) {
+        if (lazyComponent._status === Pending) {
+          var defaultExport = moduleObject.default;
+
+          {
+            if (defaultExport === undefined) {
+              error('lazy: Expected the result of a dynamic import() call. ' + 'Instead received: %s\n\nYour code should look like: \n  ' + "const MyComponent = lazy(() => import('./MyComponent'))", moduleObject);
+            }
+          }
+
+          lazyComponent._status = Resolved;
+          lazyComponent._result = defaultExport;
+        }
+      }, function (error) {
+        if (lazyComponent._status === Pending) {
+          lazyComponent._status = Rejected;
+          lazyComponent._result = error;
+        }
+      });
+    }
+  }
+
+  function getWrappedName(outerType, innerType, wrapperName) {
+    var functionName = innerType.displayName || innerType.name || '';
+    return outerType.displayName || (functionName !== '' ? wrapperName + "(" + functionName + ")" : wrapperName);
+  }
+
+  function getComponentName(type) {
+    if (type == null) {
+      // Host root, text node or just invalid type.
+      return null;
+    }
+
+    {
+      if (typeof type.tag === 'number') {
+        error('Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
+      }
+    }
+
+    if (typeof type === 'function') {
+      return type.displayName || type.name || null;
+    }
+
+    if (typeof type === 'string') {
+      return type;
+    }
+
+    switch (type) {
+      case REACT_FRAGMENT_TYPE:
+        return 'Fragment';
+
+      case REACT_PORTAL_TYPE:
+        return 'Portal';
+
+      case REACT_PROFILER_TYPE:
+        return "Profiler";
+
+      case REACT_STRICT_MODE_TYPE:
+        return 'StrictMode';
+
+      case REACT_SUSPENSE_TYPE:
+        return 'Suspense';
+
+      case REACT_SUSPENSE_LIST_TYPE:
+        return 'SuspenseList';
+    }
+
+    if (typeof type === 'object') {
+      switch (type.$$typeof) {
+        case REACT_CONTEXT_TYPE:
+          return 'Context.Consumer';
+
+        case REACT_PROVIDER_TYPE:
+          return 'Context.Provider';
+
+        case REACT_FORWARD_REF_TYPE:
+          return getWrappedName(type, type.render, 'ForwardRef');
+
+        case REACT_MEMO_TYPE:
+          return getComponentName(type.type);
+
+        case REACT_BLOCK_TYPE:
+          return getComponentName(type.render);
+
+        case REACT_LAZY_TYPE:
+          {
+            var thenable = type;
+            var resolvedThenable = refineResolvedLazyComponent(thenable);
+
+            if (resolvedThenable) {
+              return getComponentName(resolvedThenable);
+            }
+
+            break;
+          }
+      }
+    }
+
+    return null;
+  }
+
+  var ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+
+  function describeFiber(fiber) {
+    switch (fiber.tag) {
+      case HostRoot:
+      case HostPortal:
+      case HostText:
+      case Fragment:
+      case ContextProvider:
+      case ContextConsumer:
+        return '';
+
+      default:
+        var owner = fiber._debugOwner;
+        var source = fiber._debugSource;
+        var name = getComponentName(fiber.type);
+        var ownerName = null;
+
+        if (owner) {
+          ownerName = getComponentName(owner.type);
+        }
+
+        return describeComponentFrame(name, source, ownerName);
+    }
+  }
+
+  function getStackByFiberInDevAndProd(workInProgress) {
+    var info = '';
+    var node = workInProgress;
+
+    do {
+      info += describeFiber(node);
+      node = node.return;
+    } while (node);
+
+    return info;
+  }
+  var current = null;
+  var isRendering = false;
+  function getCurrentFiberOwnerNameInDevOrNull() {
+    {
+      if (current === null) {
+        return null;
+      }
+
+      var owner = current._debugOwner;
+
+      if (owner !== null && typeof owner !== 'undefined') {
+        return getComponentName(owner.type);
+      }
+    }
+
+    return null;
+  }
+  function getCurrentFiberStackInDev() {
+    {
+      if (current === null) {
+        return '';
+      } // Safe because if current fiber exists, we are reconciling,
+      // and it is guaranteed to be the work-in-progress version.
+
+
+      return getStackByFiberInDevAndProd(current);
+    }
+  }
+  function resetCurrentFiber() {
+    {
+      ReactDebugCurrentFrame$1.getCurrentStack = null;
+      current = null;
+      isRendering = false;
+    }
+  }
+  function setCurrentFiber(fiber) {
+    {
+      ReactDebugCurrentFrame$1.getCurrentStack = getCurrentFiberStackInDev;
+      current = fiber;
+      isRendering = false;
+    }
+  }
+  function setIsRendering(rendering) {
+    {
+      isRendering = rendering;
+    }
+  }
+
   // Flow does not allow string concatenation of most non-string types. To work
   // around this limitation, we use an opaque type that can only be obtained by
   // passing the value through getToStringValue first.
@@ -1656,110 +1656,47 @@
     }
   }
 
-  /**
-   * Copyright (c) 2013-present, Facebook, Inc.
-   *
-   * This source code is licensed under the MIT license found in the
-   * LICENSE file in the root directory of this source tree.
-   */
-
-  var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-  var ReactPropTypesSecret_1 = ReactPropTypesSecret;
-
-  var printWarning$1 = function() {};
-
-  {
-    var ReactPropTypesSecret$1 = ReactPropTypesSecret_1;
-    var loggedTypeFailures = {};
-    var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-    printWarning$1 = function(text) {
-      var message = 'Warning: ' + text;
-      if (typeof console !== 'undefined') {
-        console.error(message);
-      }
-      try {
-        // --- Welcome to debugging React ---
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        throw new Error(message);
-      } catch (x) {}
-    };
-  }
-
-  /**
-   * Assert that the values match with the type specs.
-   * Error messages are memorized and will only be shown once.
-   *
-   * @param {object} typeSpecs Map of name to a ReactPropType
-   * @param {object} values Runtime values that need to be type-checked
-   * @param {string} location e.g. "prop", "context", "child context"
-   * @param {string} componentName Name of the component for error messages.
-   * @param {?Function} getStack Returns the component stack.
-   * @private
-   */
-  function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
+  var loggedTypeFailures = {};
+  function checkPropTypes(typeSpecs, values, location, componentName) {
     {
+      // $FlowFixMe This is okay but Flow doesn't know it.
+      var has = Function.call.bind(Object.prototype.hasOwnProperty);
+
       for (var typeSpecName in typeSpecs) {
         if (has(typeSpecs, typeSpecName)) {
-          var error;
-          // Prop type validation may throw. In case they do, we don't want to
+          var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
           // fail the render phase where it didn't fail before. So we log it.
           // After these have been cleaned up, we'll let them throw.
+
           try {
             // This is intentionally an invariant that gets caught. It's the same
             // behavior as without this statement except with a better message.
             if (typeof typeSpecs[typeSpecName] !== 'function') {
-              var err = Error(
-                (componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' +
-                'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.'
-              );
+              var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' + 'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.');
               err.name = 'Invariant Violation';
               throw err;
             }
-            error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret$1);
+
+            error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
           } catch (ex) {
-            error = ex;
+            error$1 = ex;
           }
-          if (error && !(error instanceof Error)) {
-            printWarning$1(
-              (componentName || 'React class') + ': type specification of ' +
-              location + ' `' + typeSpecName + '` is invalid; the type checker ' +
-              'function must return `null` or an `Error` but returned a ' + typeof error + '. ' +
-              'You may have forgotten to pass an argument to the type checker ' +
-              'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' +
-              'shape all require an argument).'
-            );
+
+          if (error$1 && !(error$1 instanceof Error)) {
+            error('%s: type specification of %s' + ' `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error$1);
           }
-          if (error instanceof Error && !(error.message in loggedTypeFailures)) {
+
+          if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
             // Only monitor this failure once because there tends to be a lot of the
             // same error.
-            loggedTypeFailures[error.message] = true;
+            loggedTypeFailures[error$1.message] = true;
 
-            var stack = getStack ? getStack() : '';
-
-            printWarning$1(
-              'Failed ' + location + ' type: ' + error.message + (stack != null ? stack : '')
-            );
+            error('Failed %s type: %s', location, error$1.message);
           }
         }
       }
     }
   }
-
-  /**
-   * Resets warning cache when testing.
-   *
-   * @private
-   */
-  checkPropTypes.resetWarningCache = function() {
-    {
-      loggedTypeFailures = {};
-    }
-  };
-
-  var checkPropTypes_1 = checkPropTypes;
 
   var ReactDebugCurrentFrame$2 = null;
   var ReactControlledValuePropTypes = {
@@ -1799,7 +1736,7 @@
      */
 
     ReactControlledValuePropTypes.checkPropTypes = function (tagName, props) {
-      checkPropTypes_1(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$2.getStackAddendum);
+      checkPropTypes(propTypes, props, 'prop', tagName, ReactDebugCurrentFrame$2.getStackAddendum);
     };
   }
 
@@ -2911,7 +2848,7 @@
   function get(key) {
     return key._reactInternalFiber;
   }
-  function has$1(key) {
+  function has(key) {
     return key._reactInternalFiber !== undefined;
   }
   function set(key, value) {
@@ -5799,7 +5736,6 @@
   }
 
   var didWarnInvalidHydration = false;
-  var didWarnShadyDOM = false;
   var DANGEROUSLY_SET_INNER_HTML = 'dangerouslySetInnerHTML';
   var SUPPRESS_CONTENT_EDITABLE_WARNING = 'suppressContentEditableWarning';
   var SUPPRESS_HYDRATION_WARNING = 'suppressHydrationWarning';
@@ -6119,12 +6055,6 @@
 
     {
       validatePropertiesInDevelopment(tag, rawProps);
-
-      if (isCustomComponentTag && !didWarnShadyDOM && domElement.shadyRoot) {
-        error('%s is using shady DOM. Using shady DOM with React can ' + 'cause things to break subtly.', getCurrentFiberOwnerNameInDevOrNull() || 'A component');
-
-        didWarnShadyDOM = true;
-      }
     } // TODO: Make sure that we check isMounted before firing any of these events.
 
 
@@ -6478,12 +6408,6 @@
       suppressHydrationWarning = rawProps[SUPPRESS_HYDRATION_WARNING] === true;
       isCustomComponentTag = isCustomComponent(tag, rawProps);
       validatePropertiesInDevelopment(tag, rawProps);
-
-      if (isCustomComponentTag && !didWarnShadyDOM && domElement.shadyRoot) {
-        error('%s is using shady DOM. Using shady DOM with React can ' + 'cause things to break subtly.', getCurrentFiberOwnerNameInDevOrNull() || 'A component');
-
-        didWarnShadyDOM = true;
-      }
     } // TODO: Make sure that we check isMounted before firing any of these events.
 
 
@@ -11001,7 +10925,7 @@
 
       {
         var name = getComponentName(type) || 'Unknown';
-        checkPropTypes_1(contextTypes, context, 'context', name, getCurrentFiberStackInDev);
+        checkPropTypes(contextTypes, context, 'context', name);
       } // Cache unmasked context so we can avoid recreating masked context unless necessary.
       // Context is created before the class component is instantiated so check for instance.
 
@@ -11075,18 +10999,9 @@
       }
 
       var childContext;
-
-      {
-        setCurrentPhase('getChildContext');
-      }
-
       startPhaseTimer(fiber, 'getChildContext');
       childContext = instance.getChildContext();
       stopPhaseTimer();
-
-      {
-        setCurrentPhase(null);
-      }
 
       for (var contextKey in childContext) {
         if (!(contextKey in childContextTypes)) {
@@ -11098,12 +11013,7 @@
 
       {
         var name = getComponentName(type) || 'Unknown';
-        checkPropTypes_1(childContextTypes, childContext, 'child context', name, // In practice, there is one case in which we won't get a stack. It's when
-        // somebody calls unstable_renderSubtreeIntoContainer() and we process
-        // context from the parent component instance. The stack will be missing
-        // because it's outside of the reconciliation, and so the pointer has not
-        // been set. This is rare and doesn't matter. We'll also remove that API.
-        getCurrentFiberStackInDev);
+        checkPropTypes(childContextTypes, childContext, 'child context', name);
       }
 
       return _assign({}, parentContext, {}, childContext);
@@ -17130,7 +17040,6 @@
   var didWarnAboutGetDerivedStateOnFunctionComponent;
   var didWarnAboutFunctionRefs;
   var didWarnAboutReassigningProps;
-  var didWarnAboutMaxDuration;
   var didWarnAboutRevealOrder;
   var didWarnAboutTailOptions;
 
@@ -17141,7 +17050,6 @@
     didWarnAboutGetDerivedStateOnFunctionComponent = {};
     didWarnAboutFunctionRefs = {};
     didWarnAboutReassigningProps = false;
-    didWarnAboutMaxDuration = false;
     didWarnAboutRevealOrder = {};
     didWarnAboutTailOptions = {};
   }
@@ -17191,8 +17099,8 @@
         var innerPropTypes = Component.propTypes;
 
         if (innerPropTypes) {
-          checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
-          'prop', getComponentName(Component), getCurrentFiberStackInDev);
+          checkPropTypes(innerPropTypes, nextProps, // Resolved props
+          'prop', getComponentName(Component));
         }
       }
     }
@@ -17205,7 +17113,7 @@
 
     {
       ReactCurrentOwner$1.current = workInProgress;
-      setCurrentPhase('render');
+      setIsRendering(true);
       nextChildren = renderWithHooks(current, workInProgress, render, nextProps, ref, renderExpirationTime);
 
       if ( workInProgress.mode & StrictMode) {
@@ -17215,7 +17123,7 @@
         }
       }
 
-      setCurrentPhase(null);
+      setIsRendering(false);
     }
 
     if (current !== null && !didReceiveUpdate) {
@@ -17260,8 +17168,8 @@
         if (innerPropTypes) {
           // Inner memo component props aren't currently validated in createElement.
           // We could move it there, but we'd still need this for lazy code path.
-          checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
-          'prop', getComponentName(type), getCurrentFiberStackInDev);
+          checkPropTypes(innerPropTypes, nextProps, // Resolved props
+          'prop', getComponentName(type));
         }
       }
 
@@ -17279,8 +17187,8 @@
       if (_innerPropTypes) {
         // Inner memo component props aren't currently validated in createElement.
         // We could move it there, but we'd still need this for lazy code path.
-        checkPropTypes_1(_innerPropTypes, nextProps, // Resolved props
-        'prop', getComponentName(_type), getCurrentFiberStackInDev);
+        checkPropTypes(_innerPropTypes, nextProps, // Resolved props
+        'prop', getComponentName(_type));
       }
     }
 
@@ -17328,8 +17236,8 @@
         var outerPropTypes = outerMemoType && outerMemoType.propTypes;
 
         if (outerPropTypes) {
-          checkPropTypes_1(outerPropTypes, nextProps, // Resolved (SimpleMemoComponent has no defaultProps)
-          'prop', getComponentName(outerMemoType), getCurrentFiberStackInDev);
+          checkPropTypes(outerPropTypes, nextProps, // Resolved (SimpleMemoComponent has no defaultProps)
+          'prop', getComponentName(outerMemoType));
         } // Inner propTypes will be validated in the function component path.
 
       }
@@ -17405,8 +17313,8 @@
         var innerPropTypes = Component.propTypes;
 
         if (innerPropTypes) {
-          checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
-          'prop', getComponentName(Component), getCurrentFiberStackInDev);
+          checkPropTypes(innerPropTypes, nextProps, // Resolved props
+          'prop', getComponentName(Component));
         }
       }
     }
@@ -17423,7 +17331,7 @@
 
     {
       ReactCurrentOwner$1.current = workInProgress;
-      setCurrentPhase('render');
+      setIsRendering(true);
       nextChildren = renderWithHooks(current, workInProgress, Component, nextProps, context, renderExpirationTime);
 
       if ( workInProgress.mode & StrictMode) {
@@ -17433,7 +17341,7 @@
         }
       }
 
-      setCurrentPhase(null);
+      setIsRendering(false);
     }
 
     if (current !== null && !didReceiveUpdate) {
@@ -17459,7 +17367,7 @@
 
     {
       ReactCurrentOwner$1.current = workInProgress;
-      setCurrentPhase('render');
+      setIsRendering(true);
       nextChildren = renderWithHooks(current, workInProgress, render, nextProps, data, renderExpirationTime);
 
       if ( workInProgress.mode & StrictMode) {
@@ -17469,7 +17377,7 @@
         }
       }
 
-      setCurrentPhase(null);
+      setIsRendering(false);
     }
 
     if (current !== null && !didReceiveUpdate) {
@@ -17491,8 +17399,8 @@
         var innerPropTypes = Component.propTypes;
 
         if (innerPropTypes) {
-          checkPropTypes_1(innerPropTypes, nextProps, // Resolved props
-          'prop', getComponentName(Component), getCurrentFiberStackInDev);
+          checkPropTypes(innerPropTypes, nextProps, // Resolved props
+          'prop', getComponentName(Component));
         }
       }
     } // Push context providers early to prevent context stack mismatches.
@@ -17585,14 +17493,14 @@
       }
     } else {
       {
-        setCurrentPhase('render');
+        setIsRendering(true);
         nextChildren = instance.render();
 
         if ( workInProgress.mode & StrictMode) {
           instance.render();
         }
 
-        setCurrentPhase(null);
+        setIsRendering(false);
       }
     } // React DevTools reads this flag.
 
@@ -17805,8 +17713,8 @@
               var outerPropTypes = Component.propTypes;
 
               if (outerPropTypes) {
-                checkPropTypes_1(outerPropTypes, resolvedProps, // Resolved for outer only
-                'prop', getComponentName(Component), getCurrentFiberStackInDev);
+                checkPropTypes(outerPropTypes, resolvedProps, // Resolved for outer only
+                'prop', getComponentName(Component));
               }
             }
           }
@@ -18082,17 +17990,7 @@
     }
 
     suspenseContext = setDefaultShallowSuspenseContext(suspenseContext);
-    pushSuspenseContext(workInProgress, suspenseContext);
-
-    {
-      if ('maxDuration' in nextProps) {
-        if (!didWarnAboutMaxDuration) {
-          didWarnAboutMaxDuration = true;
-
-          error('maxDuration has been removed from React. ' + 'Remove the maxDuration prop.');
-        }
-      }
-    } // This next part is a bit confusing. If the children timeout, we switch to
+    pushSuspenseContext(workInProgress, suspenseContext); // This next part is a bit confusing. If the children timeout, we switch to
     // showing the fallback children in place of the "primary" children.
     // However, we don't want to delete the primary children because then their
     // state will be lost (both the React state and the host state, e.g.
@@ -18113,7 +18011,6 @@
     // Otherwise, we render the primary children directly. This requires some
     // custom reconciliation logic to preserve the state of the primary
     // children. It's essentially a very basic form of re-parenting.
-
 
     if (current === null) {
       // If we're currently hydrating, try to hydrate this boundary.
@@ -18900,7 +18797,7 @@
       var providerPropTypes = workInProgress.type.propTypes;
 
       if (providerPropTypes) {
-        checkPropTypes_1(providerPropTypes, newProps, 'prop', 'Context.Provider', getCurrentFiberStackInDev);
+        checkPropTypes(providerPropTypes, newProps, 'prop', 'Context.Provider');
       }
     }
 
@@ -18970,9 +18867,9 @@
 
     {
       ReactCurrentOwner$1.current = workInProgress;
-      setCurrentPhase('render');
+      setIsRendering(true);
       newChildren = render(newValue);
-      setCurrentPhase(null);
+      setIsRendering(false);
     } // React DevTools reads this flag.
 
 
@@ -19352,8 +19249,8 @@
               var outerPropTypes = _type2.propTypes;
 
               if (outerPropTypes) {
-                checkPropTypes_1(outerPropTypes, _resolvedProps3, // Resolved for outer only
-                'prop', getComponentName(_type2), getCurrentFiberStackInDev);
+                checkPropTypes(outerPropTypes, _resolvedProps3, // Resolved for outer only
+                'prop', getComponentName(_type2));
               }
             }
           }
@@ -20423,7 +20320,7 @@
                   }
 
                   if (instance.state !== finishedWork.memoizedState) {
-                    error('Expected %s state to match memoized state before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
+                    error('Expected %s state to match memoized state before ' + 'getSnapshotBeforeUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.state`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
                   }
                 }
               }
@@ -20578,7 +20475,7 @@
                   }
 
                   if (instance.state !== finishedWork.memoizedState) {
-                    error('Expected %s state to match memoized state before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
+                    error('Expected %s state to match memoized state before ' + 'componentDidMount. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.state`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
                   }
                 }
               }
@@ -20599,7 +20496,7 @@
                   }
 
                   if (instance.state !== finishedWork.memoizedState) {
-                    error('Expected %s state to match memoized state before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
+                    error('Expected %s state to match memoized state before ' + 'componentDidUpdate. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.state`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
                   }
                 }
               }
@@ -20619,7 +20516,7 @@
                 }
 
                 if (instance.state !== finishedWork.memoizedState) {
-                  error('Expected %s state to match memoized state before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.props`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
+                  error('Expected %s state to match memoized state before ' + 'processing the update queue. ' + 'This might either be because of a bug in React, or because ' + 'a component reassigns its own `this.state`. ' + 'Please file an issue.', getComponentName(finishedWork.type) || 'instance');
                 }
               }
             } // We could update instance props and state here,
@@ -22101,7 +21998,7 @@
     var nextKnownPendingLevel = root.nextKnownPendingLevel;
     var nextLevel = lastPingedTime > nextKnownPendingLevel ? lastPingedTime : nextKnownPendingLevel;
 
-    if ( nextLevel <= Idle && firstPendingTime !== nextLevel) {
+    if (nextLevel <= Idle && firstPendingTime !== nextLevel) {
       // Don't work on Idle/Never priority unless everything else is committed.
       return NoWork;
     }
@@ -23806,7 +23703,6 @@
 
 
     root.lastPingedTime = suspendedTime;
-
     ensureRootIsScheduled(root);
     schedulePendingInteractions(root, suspendedTime);
   }
@@ -24051,7 +23947,6 @@
   }
 
   var didWarnAboutUpdateInRender = false;
-  var didWarnAboutUpdateInGetChildContext = false;
 
   function warnAboutRenderPhaseUpdatesInDEV(fiber) {
     {
@@ -24068,29 +23963,12 @@
 
           case ClassComponent:
             {
-              switch (phase) {
-                case 'getChildContext':
-                  if (didWarnAboutUpdateInGetChildContext) {
-                    return;
-                  }
+              if (isRendering && !didWarnAboutUpdateInRender) {
+                error('Cannot update during an existing state transition (such as ' + 'within `render`). Render methods should be a pure ' + 'function of props and state.');
 
-                  error('setState(...): Cannot call setState() inside getChildContext()');
-
-                  didWarnAboutUpdateInGetChildContext = true;
-                  break;
-
-                case 'render':
-                  if (didWarnAboutUpdateInRender) {
-                    return;
-                  }
-
-                  error('Cannot update during an existing state transition (such as ' + 'within `render`). Render methods should be a pure ' + 'function of props and state.');
-
-                  didWarnAboutUpdateInRender = true;
-                  break;
+                didWarnAboutUpdateInRender = true;
+                break;
               }
-
-              break;
             }
         }
       }
@@ -25193,7 +25071,7 @@
     }
 
     {
-      if (phase === 'render' && current !== null && !didWarnAboutNestedUpdates) {
+      if (isRendering && current !== null && !didWarnAboutNestedUpdates) {
         didWarnAboutNestedUpdates = true;
 
         error('Render methods should be a pure function of props and state; ' + 'triggering nested component updates from render is not allowed. ' + 'If necessary, trigger nested updates in componentDidUpdate.\n\n' + 'Check the render method of %s.', getComponentName(current.type) || 'Unknown');
@@ -25756,7 +25634,7 @@
       }
     }
 
-    if (!(parentComponent != null && has$1(parentComponent))) {
+    if (!(parentComponent != null && has(parentComponent))) {
       {
         throw Error( "parentComponent must be a valid React Component" );
       }
@@ -25830,7 +25708,7 @@
     };
   }
 
-  var ReactVersion = '16.12.0';
+  var ReactVersion = '16.13.0';
 
   setAttemptSynchronousHydration(attemptSynchronousHydration$1);
   setAttemptUserBlockingHydration(attemptUserBlockingHydration$1);
