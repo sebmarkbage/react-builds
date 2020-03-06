@@ -564,15 +564,15 @@
       "filename": "react-noop-renderer-persistent.development.js",
       "bundleType": "NODE_DEV",
       "packageName": "react-noop-renderer",
-      "size": 30024,
-      "gzip": 5901
+      "size": 29993,
+      "gzip": 5894
     },
     {
       "filename": "react-noop-renderer-persistent.production.min.js",
       "bundleType": "NODE_PROD",
       "packageName": "react-noop-renderer",
-      "size": 12305,
-      "gzip": 3656
+      "size": 12294,
+      "gzip": 3657
     },
     {
       "filename": "react-noop-renderer-server.development.js",
@@ -629,20 +629,6 @@
       "packageName": "react-reconciler",
       "size": 78299,
       "gzip": 22963
-    },
-    {
-      "filename": "react-reconciler-persistent.development.js",
-      "bundleType": "NODE_DEV",
-      "packageName": "react-reconciler",
-      "size": 567879,
-      "gzip": 120256
-    },
-    {
-      "filename": "react-reconciler-persistent.production.min.js",
-      "bundleType": "NODE_PROD",
-      "packageName": "react-reconciler",
-      "size": 75481,
-      "gzip": 22288
     },
     {
       "filename": "react-server.development.js",
