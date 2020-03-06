@@ -411,7 +411,9 @@ var _require = require("ReactFeatureFlags"),
     _require.disableSchedulerTimeoutBasedOnReactExpirationTime,
   warnAboutSpreadingKeyToJSX = _require.warnAboutSpreadingKeyToJSX; // On WWW, true is used for a new modern build.
 
+// TODO: Move this to "react" once we can import from externals.
 var Resolved = 1;
+
 function refineResolvedLazyComponent(lazyComponent) {
   return lazyComponent._status === Resolved ? lazyComponent._result : null;
 }
@@ -422,6 +424,10 @@ function getWrappedName(outerType, innerType, wrapperName) {
     outerType.displayName ||
     (functionName !== "" ? wrapperName + "(" + functionName + ")" : wrapperName)
   );
+}
+
+function getContextName(type) {
+  return type.displayName || "Context";
 }
 
 function getComponentName(type) {
@@ -470,10 +476,12 @@ function getComponentName(type) {
   if (typeof type === "object") {
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        var context = type;
+        return getContextName(context) + ".Consumer";
 
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        var provider = type;
+        return getContextName(provider._context) + ".Provider";
 
       case REACT_FORWARD_REF_TYPE:
         return getWrappedName(type, type.render, "ForwardRef");
@@ -1572,6 +1580,11 @@ function createContext(defaultValue, calculateChangedBits) {
 
           return context.Consumer;
         }
+      },
+      displayName: {
+        get: function() {
+          return context.displayName;
+        }
       }
     }); // $FlowFixMe: Flow complains about missing properties because it doesn't understand defineProperty
 
@@ -1589,16 +1602,16 @@ function createContext(defaultValue, calculateChangedBits) {
 function lazy(ctor) {
   var lazyType = {
     $$typeof: REACT_LAZY_TYPE,
-    _ctor: ctor,
     // React uses these fields to store the result.
     _status: -1,
-    _result: null
+    _result: ctor
   };
 
   {
     // In production, this would just set it on the object.
     var defaultProps;
-    var propTypes;
+    var propTypes; // $FlowFixMe
+
     Object.defineProperties(lazyType, {
       defaultProps: {
         configurable: true,
@@ -1613,6 +1626,7 @@ function lazy(ctor) {
           );
 
           defaultProps = newDefaultProps; // Match production behavior more closely:
+          // $FlowFixMe
 
           Object.defineProperty(lazyType, "defaultProps", {
             enumerable: true
@@ -1632,6 +1646,7 @@ function lazy(ctor) {
           );
 
           propTypes = newPropTypes; // Match production behavior more closely:
+          // $FlowFixMe
 
           Object.defineProperty(lazyType, "propTypes", {
             enumerable: true

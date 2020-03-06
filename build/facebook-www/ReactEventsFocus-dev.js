@@ -420,7 +420,8 @@ var focusResponderImpl = {
   onUnmount: function(context, props, state) {
     unmountFocusResponder(context, props, state);
   }
-};
+}; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
 var FocusResponder = React.DEPRECATED_createResponder(
   "Focus",
   focusResponderImpl
@@ -586,7 +587,8 @@ var focusWithinResponderImpl = {
   onUnmount: function(context, props, state) {
     unmountFocusWithinResponder(context, props, state);
   }
-};
+}; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
 var FocusWithinResponder = React.DEPRECATED_createResponder(
   "FocusWithin",
   focusWithinResponderImpl

@@ -81,7 +81,8 @@ var contextMenuImpl = {
       state.pointerType = pointerType;
     }
   }
-};
+}; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
 var ContextMenuResponder = React.DEPRECATED_createResponder(
   "ContextMenu",
   contextMenuImpl

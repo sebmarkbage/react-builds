@@ -525,7 +525,6 @@
    * Same as `accumulateTwoPhaseDispatchesSingle`, but skips over the targetID.
    */
 
-
   function accumulateTwoPhaseDispatchesSingleSkipTarget(event) {
     if (event && event.dispatchConfig.phasedRegistrationNames) {
       var targetInst = event._targetInst;

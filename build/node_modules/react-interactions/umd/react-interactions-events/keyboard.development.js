@@ -201,7 +201,8 @@
         }
       }
     }
-  };
+  }; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
   var KeyboardResponder = React.DEPRECATED_createResponder('Keyboard', keyboardResponderImpl);
   function useKeyboard(props) {
     return React.DEPRECATED_useResponder(KeyboardResponder, props);

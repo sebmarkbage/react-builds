@@ -895,9 +895,10 @@ function getIteratorFn(maybeIterable) {
 }
 function initializeLazyComponentType(lazyComponent) {
   if (-1 === lazyComponent._status) {
-    lazyComponent._status = 0;
-    var ctor = lazyComponent._ctor;
+    var ctor = lazyComponent._result;
+    ctor || (ctor = lazyComponent._ctor);
     ctor = ctor();
+    lazyComponent._status = 0;
     lazyComponent._result = ctor;
     ctor.then(
       function(moduleObject) {
@@ -934,9 +935,9 @@ function getComponentName(type) {
   if ("object" === typeof type)
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        return (type.displayName || "Context") + ".Consumer";
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        return (type._context.displayName || "Context") + ".Provider";
       case REACT_FORWARD_REF_TYPE:
         var innerType = type.render;
         innerType = innerType.displayName || innerType.name || "";
@@ -1620,10 +1621,13 @@ function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
         break;
       default:
         -1 === mediaEventTypes.indexOf(topLevelType) &&
-          trapBubbledEvent(topLevelType, mountAt);
+          legacyTrapBubbledEvent(topLevelType, mountAt);
     }
     listenerMap.set(topLevelType, null);
   }
+}
+function legacyTrapBubbledEvent(topLevelType, element) {
+  trapEventForPluginEventSystem(element, topLevelType, !1);
 }
 var attemptSynchronousHydration,
   attemptUserBlockingHydration,
@@ -2055,9 +2059,6 @@ for (
 var UserBlockingPriority$1 = Scheduler.unstable_UserBlockingPriority,
   runWithPriority$1 = Scheduler.unstable_runWithPriority,
   _enabled = !0;
-function trapBubbledEvent(topLevelType, element) {
-  trapEventForPluginEventSystem(element, topLevelType, !1);
-}
 function addResponderEventSystemEvent(document, topLevelType, passive) {
   var eventFlags = 2;
   passive
@@ -2080,19 +2081,15 @@ function trapEventForPluginEventSystem(container, topLevelType, capture) {
   var listener = eventPriorities.get(topLevelType);
   switch (void 0 === listener ? 2 : listener) {
     case 0:
-      listener = dispatchDiscreteEvent.bind(null, topLevelType, 1, container);
+      listener = dispatchDiscreteEvent;
       break;
     case 1:
-      listener = dispatchUserBlockingUpdate.bind(
-        null,
-        topLevelType,
-        1,
-        container
-      );
+      listener = dispatchUserBlockingUpdate;
       break;
     default:
-      listener = dispatchEvent.bind(null, topLevelType, 1, container);
+      listener = dispatchEvent;
   }
+  listener = listener.bind(null, topLevelType, 1, container);
   capture
     ? EventListenerWWW.capture(container, topLevelType, listener)
     : EventListenerWWW.listen(container, topLevelType, listener);
@@ -2376,17 +2373,18 @@ function isCustomComponent(tagName, props) {
   }
 }
 var HTML_NAMESPACE$1 = Namespaces.html;
-function ensureListeningTo(rootContainerElement, registrationName) {
-  rootContainerElement =
-    9 === rootContainerElement.nodeType || 11 === rootContainerElement.nodeType
-      ? rootContainerElement
-      : rootContainerElement.ownerDocument;
-  var listenerMap = getListenerMapForElement(rootContainerElement);
+function ensureListeningTo(rootContainerInstance, registrationName) {
+  rootContainerInstance =
+    9 === rootContainerInstance.nodeType ||
+    11 === rootContainerInstance.nodeType
+      ? rootContainerInstance
+      : rootContainerInstance.ownerDocument;
+  var listenerMap = getListenerMapForElement(rootContainerInstance);
   registrationName = registrationNameDependencies[registrationName];
   for (var i = 0; i < registrationName.length; i++)
     legacyListenToTopLevelEvent(
       registrationName[i],
-      rootContainerElement,
+      rootContainerInstance,
       listenerMap
     );
 }
@@ -2756,9 +2754,6 @@ function accumulateDirectDispatchesSingle(event) {
     event.dispatchConfig.registrationName &&
     accumulateDispatches(event._targetInst, null, event);
 }
-function accumulateTwoPhaseDispatches(events) {
-  forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
-}
 var root = null,
   startText = null,
   fallbackText = null;
@@ -3067,7 +3062,7 @@ var BeforeInputEventPlugin = {
             ? (eventType.data = composition)
             : ((composition = getDataFromCustomEvent(nativeEvent)),
               null !== composition && (eventType.data = composition)),
-          accumulateTwoPhaseDispatches(eventType),
+          accumulateTwoPhaseDispatchesSingle(eventType),
           (composition = eventType))
         : (composition = null);
       (topLevelType = canUseTextInputEvent
@@ -3080,7 +3075,7 @@ var BeforeInputEventPlugin = {
             nativeEventTarget
           )),
           (targetInst.data = topLevelType),
-          accumulateTwoPhaseDispatches(targetInst))
+          accumulateTwoPhaseDispatchesSingle(targetInst))
         : (targetInst = null);
       return null === composition
         ? targetInst
@@ -3134,7 +3129,7 @@ function createAndAccumulateChangeEvent(inst, nativeEvent, target) {
   );
   inst.type = "change";
   enqueueStateRestore(target);
-  accumulateTwoPhaseDispatches(inst);
+  accumulateTwoPhaseDispatchesSingle(inst);
   return inst;
 }
 var activeElement = null,
@@ -3582,7 +3577,7 @@ function constructSelectEvent(nativeEvent, nativeEventTarget) {
       )),
       (nativeEvent.type = "select"),
       (nativeEvent.target = activeElement$1),
-      accumulateTwoPhaseDispatches(nativeEvent),
+      accumulateTwoPhaseDispatchesSingle(nativeEvent),
       nativeEvent);
 }
 var SelectEventPlugin = {
@@ -3885,7 +3880,7 @@ var normalizeKey = {
         nativeEvent,
         nativeEventTarget
       );
-      accumulateTwoPhaseDispatches(targetInst);
+      accumulateTwoPhaseDispatchesSingle(targetInst);
       return targetInst;
     }
   };
@@ -3896,9 +3891,9 @@ eventPluginOrder = Array.prototype.slice.call(
   )
 );
 recomputePluginOrdering();
-var getInstanceFromNodeImpl$jscomp$inline_339 = getInstanceFromNode$2;
+var getInstanceFromNodeImpl$jscomp$inline_322 = getInstanceFromNode$2;
 getFiberCurrentPropsFromNode = getFiberCurrentPropsFromNode$1;
-getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_339;
+getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_322;
 getNodeFromInstance = getNodeFromInstance$1;
 injectEventPluginsByName({
   SimpleEventPlugin: SimpleEventPlugin,
@@ -7048,6 +7043,14 @@ function bailoutOnAlreadyFinishedWork(
   }
   return workInProgress.child;
 }
+function isFiberSuspenseAndTimedOut(fiber) {
+  var memoizedState = fiber.memoizedState;
+  return (
+    13 === fiber.tag &&
+    null !== memoizedState &&
+    null === memoizedState.dehydrated
+  );
+}
 var emptyObject$1 = {};
 function collectScopedNodesFromChildren(
   startingChild,
@@ -7067,9 +7070,7 @@ function collectScopedNodesFromChildren(
         scopedNodes.push(instance);
     }
     type = node.child;
-    13 === node.tag &&
-      null !== node.memoizedState &&
-      (type = node.child.sibling.child);
+    isFiberSuspenseAndTimedOut(node) && (type = node.child.sibling.child);
     null !== type && collectScopedNodesFromChildren(type, fn, scopedNodes);
     startingChild = startingChild.sibling;
   }
@@ -7089,8 +7090,7 @@ function collectFirstScopedNodeFromChildren(startingChild, fn$jscomp$0) {
         }
       }
       type = scopedNode.child;
-      13 === scopedNode.tag &&
-        null !== scopedNode.memoizedState &&
+      isFiberSuspenseAndTimedOut(scopedNode) &&
         (type = scopedNode.child.sibling.child);
       scopedNode =
         null !== type ? collectFirstScopedNodeFromChildren(type, fn) : null;
@@ -7113,9 +7113,7 @@ function collectNearestChildContextValues(
       childContextValues.push(node.memoizedProps.value);
     else {
       var child = node.child;
-      13 === node.tag &&
-        null !== node.memoizedState &&
-        (child = node.child.sibling.child);
+      isFiberSuspenseAndTimedOut(node) && (child = node.child.sibling.child);
       null !== child &&
         collectNearestChildContextValues(child, context, childContextValues);
     }
@@ -7379,42 +7377,42 @@ function completeWork(current, workInProgress, renderExpirationTime) {
             case "iframe":
             case "object":
             case "embed":
-              trapBubbledEvent("load", type);
+              legacyTrapBubbledEvent("load", type);
               break;
             case "video":
             case "audio":
               for (var i = 0; i < mediaEventTypes.length; i++)
-                trapBubbledEvent(mediaEventTypes[i], type);
+                legacyTrapBubbledEvent(mediaEventTypes[i], type);
               break;
             case "source":
-              trapBubbledEvent("error", type);
+              legacyTrapBubbledEvent("error", type);
               break;
             case "img":
             case "image":
             case "link":
-              trapBubbledEvent("error", type);
-              trapBubbledEvent("load", type);
+              legacyTrapBubbledEvent("error", type);
+              legacyTrapBubbledEvent("load", type);
               break;
             case "form":
-              trapBubbledEvent("reset", type);
-              trapBubbledEvent("submit", type);
+              legacyTrapBubbledEvent("reset", type);
+              legacyTrapBubbledEvent("submit", type);
               break;
             case "details":
-              trapBubbledEvent("toggle", type);
+              legacyTrapBubbledEvent("toggle", type);
               break;
             case "input":
               initWrapperState(type, current);
-              trapBubbledEvent("invalid", type);
+              legacyTrapBubbledEvent("invalid", type);
               ensureListeningTo(renderExpirationTime, "onChange");
               break;
             case "select":
               type._wrapperState = { wasMultiple: !!current.multiple };
-              trapBubbledEvent("invalid", type);
+              legacyTrapBubbledEvent("invalid", type);
               ensureListeningTo(renderExpirationTime, "onChange");
               break;
             case "textarea":
               initWrapperState$2(type, current),
-                trapBubbledEvent("invalid", type),
+                legacyTrapBubbledEvent("invalid", type),
                 ensureListeningTo(renderExpirationTime, "onChange");
           }
           assertValidProps(type$jscomp$0, current);
@@ -7495,39 +7493,39 @@ function completeWork(current, workInProgress, renderExpirationTime) {
             case "iframe":
             case "object":
             case "embed":
-              trapBubbledEvent("load", current);
+              legacyTrapBubbledEvent("load", current);
               i = newProps;
               break;
             case "video":
             case "audio":
               for (i = 0; i < mediaEventTypes.length; i++)
-                trapBubbledEvent(mediaEventTypes[i], current);
+                legacyTrapBubbledEvent(mediaEventTypes[i], current);
               i = newProps;
               break;
             case "source":
-              trapBubbledEvent("error", current);
+              legacyTrapBubbledEvent("error", current);
               i = newProps;
               break;
             case "img":
             case "image":
             case "link":
-              trapBubbledEvent("error", current);
-              trapBubbledEvent("load", current);
+              legacyTrapBubbledEvent("error", current);
+              legacyTrapBubbledEvent("load", current);
               i = newProps;
               break;
             case "form":
-              trapBubbledEvent("reset", current);
-              trapBubbledEvent("submit", current);
+              legacyTrapBubbledEvent("reset", current);
+              legacyTrapBubbledEvent("submit", current);
               i = newProps;
               break;
             case "details":
-              trapBubbledEvent("toggle", current);
+              legacyTrapBubbledEvent("toggle", current);
               i = newProps;
               break;
             case "input":
               initWrapperState(current, newProps);
               i = getHostProps(current, newProps);
-              trapBubbledEvent("invalid", current);
+              legacyTrapBubbledEvent("invalid", current);
               ensureListeningTo(renderExpirationTime, "onChange");
               break;
             case "option":
@@ -7536,13 +7534,13 @@ function completeWork(current, workInProgress, renderExpirationTime) {
             case "select":
               current._wrapperState = { wasMultiple: !!newProps.multiple };
               i = Object.assign({}, newProps, { value: void 0 });
-              trapBubbledEvent("invalid", current);
+              legacyTrapBubbledEvent("invalid", current);
               ensureListeningTo(renderExpirationTime, "onChange");
               break;
             case "textarea":
               initWrapperState$2(current, newProps);
               i = getHostProps$3(current, newProps);
-              trapBubbledEvent("invalid", current);
+              legacyTrapBubbledEvent("invalid", current);
               ensureListeningTo(renderExpirationTime, "onChange");
               break;
             default:
@@ -8577,9 +8575,11 @@ function commitWork(current, finishedWork) {
                 isCustomComponentTag = selectionInformation.focusedElem;
                 if ((i = null !== isCustomComponentTag))
                   b: {
-                    i = isCustomComponentTag;
+                    i = updatePayload;
                     for (
-                      propKey = getClosestInstanceFromNode(i);
+                      propKey = getClosestInstanceFromNode(
+                        isCustomComponentTag
+                      );
                       null !== propKey;
 
                     ) {
@@ -8927,246 +8927,231 @@ function performConcurrentWorkOnRoot(root, didTimeout) {
       null
     );
   var expirationTime = getNextRootExpirationTimeToWorkOn(root);
-  if (0 !== expirationTime) {
-    didTimeout = root.callbackNode;
-    if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
-      throw Error(formatProdErrorMessage(327));
-    flushPassiveEffects();
-    if (
-      root !== workInProgressRoot ||
-      expirationTime !== renderExpirationTime$1
-    )
-      prepareFreshStack(root, expirationTime),
-        startWorkOnPendingInteractions(root, expirationTime);
-    if (null !== workInProgress) {
-      var prevExecutionContext = executionContext;
-      executionContext |= RenderContext;
-      var prevDispatcher = pushDispatcher(),
-        prevInteractions = pushInteractions(root);
-      do
-        try {
-          workLoopConcurrent();
-          break;
-        } catch (thrownValue) {
-          handleError(root, thrownValue);
-        }
-      while (1);
-      resetContextDependencies();
-      executionContext = prevExecutionContext;
-      ReactCurrentDispatcher$1.current = prevDispatcher;
-      tracing.__interactionsRef.current = prevInteractions;
-      if (workInProgressRootExitStatus === RootFatalErrored)
-        throw ((didTimeout = workInProgressRootFatalError),
-        prepareFreshStack(root, expirationTime),
-        markRootSuspendedAtTime(root, expirationTime),
-        ensureRootIsScheduled(root),
-        didTimeout);
-      if (null === workInProgress)
-        switch (
-          ((prevDispatcher = root.finishedWork = root.current.alternate),
-          (root.finishedExpirationTime = expirationTime),
-          (prevExecutionContext = workInProgressRootExitStatus),
-          (workInProgressRoot = null),
-          prevExecutionContext)
-        ) {
-          case RootIncomplete:
-          case RootFatalErrored:
-            throw Error(formatProdErrorMessage(345));
-          case RootErrored:
-            markRootExpiredAtTime(
-              root,
-              2 < expirationTime ? 2 : expirationTime
-            );
-            break;
-          case RootSuspended:
-            markRootSuspendedAtTime(root, expirationTime);
-            prevExecutionContext = root.lastSuspendedTime;
-            expirationTime === prevExecutionContext &&
-              (root.nextKnownPendingLevel = getRemainingExpirationTime(
-                prevDispatcher
-              ));
-            if (
-              1073741823 === workInProgressRootLatestProcessedExpirationTime &&
-              ((prevDispatcher =
-                globalMostRecentFallbackTime + FALLBACK_THROTTLE_MS - now()),
-              10 < prevDispatcher)
-            ) {
-              if (
-                workInProgressRootHasPendingPing &&
-                ((prevInteractions = root.lastPingedTime),
-                0 === prevInteractions || prevInteractions >= expirationTime)
-              ) {
-                root.lastPingedTime = expirationTime;
-                prepareFreshStack(root, expirationTime);
-                break;
-              }
-              prevInteractions = getNextRootExpirationTimeToWorkOn(root);
-              if (0 !== prevInteractions && prevInteractions !== expirationTime)
-                break;
-              if (
-                0 !== prevExecutionContext &&
-                prevExecutionContext !== expirationTime
-              ) {
-                root.lastPingedTime = prevExecutionContext;
-                break;
-              }
-              root.timeoutHandle = scheduleTimeout(
-                commitRoot.bind(null, root),
-                prevDispatcher
-              );
-              break;
-            }
-            commitRoot(root);
-            break;
-          case RootSuspendedWithDelay:
-            markRootSuspendedAtTime(root, expirationTime);
-            prevExecutionContext = root.lastSuspendedTime;
-            expirationTime === prevExecutionContext &&
-              (root.nextKnownPendingLevel = getRemainingExpirationTime(
-                prevDispatcher
-              ));
-            if (
-              workInProgressRootHasPendingPing &&
-              ((prevDispatcher = root.lastPingedTime),
-              0 === prevDispatcher || prevDispatcher >= expirationTime)
-            ) {
-              root.lastPingedTime = expirationTime;
-              prepareFreshStack(root, expirationTime);
-              break;
-            }
-            prevDispatcher = getNextRootExpirationTimeToWorkOn(root);
-            if (0 !== prevDispatcher && prevDispatcher !== expirationTime)
-              break;
-            if (
-              0 !== prevExecutionContext &&
-              prevExecutionContext !== expirationTime
-            ) {
-              root.lastPingedTime = prevExecutionContext;
-              break;
-            }
-            1073741823 !== workInProgressRootLatestSuspenseTimeout
-              ? (prevExecutionContext =
-                  10 * (1073741821 - workInProgressRootLatestSuspenseTimeout) -
-                  now())
-              : 1073741823 === workInProgressRootLatestProcessedExpirationTime
-              ? (prevExecutionContext = 0)
-              : ((prevExecutionContext =
-                  10 *
-                    (1073741821 -
-                      workInProgressRootLatestProcessedExpirationTime) -
-                  5e3),
-                (prevDispatcher = now()),
-                (expirationTime =
-                  10 * (1073741821 - expirationTime) - prevDispatcher),
-                (prevExecutionContext = prevDispatcher - prevExecutionContext),
-                0 > prevExecutionContext && (prevExecutionContext = 0),
-                (prevExecutionContext =
-                  (120 > prevExecutionContext
-                    ? 120
-                    : 480 > prevExecutionContext
-                    ? 480
-                    : 1080 > prevExecutionContext
-                    ? 1080
-                    : 1920 > prevExecutionContext
-                    ? 1920
-                    : 3e3 > prevExecutionContext
-                    ? 3e3
-                    : 4320 > prevExecutionContext
-                    ? 4320
-                    : 1960 * ceil(prevExecutionContext / 1960)) -
-                  prevExecutionContext),
-                expirationTime < prevExecutionContext &&
-                  (prevExecutionContext = expirationTime));
-            if (10 < prevExecutionContext) {
-              root.timeoutHandle = scheduleTimeout(
-                commitRoot.bind(null, root),
-                prevExecutionContext
-              );
-              break;
-            }
-            commitRoot(root);
-            break;
-          case RootCompleted:
-            if (
-              1073741823 !== workInProgressRootLatestProcessedExpirationTime &&
-              null !== workInProgressRootCanSuspendUsingConfig
-            ) {
-              prevInteractions = workInProgressRootLatestProcessedExpirationTime;
-              var suspenseConfig = workInProgressRootCanSuspendUsingConfig;
-              prevExecutionContext = suspenseConfig.busyMinDurationMs | 0;
-              0 >= prevExecutionContext
-                ? (prevExecutionContext = 0)
-                : ((prevDispatcher = suspenseConfig.busyDelayMs | 0),
-                  (prevInteractions =
-                    now() -
-                    (10 * (1073741821 - prevInteractions) -
-                      (suspenseConfig.timeoutMs | 0 || 5e3))),
-                  (prevExecutionContext =
-                    prevInteractions <= prevDispatcher
-                      ? 0
-                      : prevDispatcher +
-                        prevExecutionContext -
-                        prevInteractions));
-              if (10 < prevExecutionContext) {
-                markRootSuspendedAtTime(root, expirationTime);
-                root.timeoutHandle = scheduleTimeout(
-                  commitRoot.bind(null, root),
-                  prevExecutionContext
-                );
-                break;
-              }
-            }
-            commitRoot(root);
-            break;
-          default:
-            throw Error(formatProdErrorMessage(329));
-        }
-      ensureRootIsScheduled(root);
-      if (root.callbackNode === didTimeout)
-        return performConcurrentWorkOnRoot.bind(null, root);
-    }
-  }
-  return null;
-}
-function performSyncWorkOnRoot(root) {
-  var lastExpiredTime = root.lastExpiredTime;
-  lastExpiredTime = 0 !== lastExpiredTime ? lastExpiredTime : 1073741823;
+  if (0 === expirationTime) return null;
+  didTimeout = root.callbackNode;
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
     throw Error(formatProdErrorMessage(327));
   flushPassiveEffects();
-  if (root !== workInProgressRoot || lastExpiredTime !== renderExpirationTime$1)
-    prepareFreshStack(root, lastExpiredTime),
-      startWorkOnPendingInteractions(root, lastExpiredTime);
-  if (null !== workInProgress) {
-    var prevExecutionContext = executionContext;
-    executionContext |= RenderContext;
-    var prevDispatcher = pushDispatcher(),
-      prevInteractions = pushInteractions(root);
-    do
-      try {
-        workLoopSync();
-        break;
-      } catch (thrownValue) {
-        handleError(root, thrownValue);
-      }
-    while (1);
-    resetContextDependencies();
-    executionContext = prevExecutionContext;
-    ReactCurrentDispatcher$1.current = prevDispatcher;
-    tracing.__interactionsRef.current = prevInteractions;
-    if (workInProgressRootExitStatus === RootFatalErrored)
-      throw ((prevExecutionContext = workInProgressRootFatalError),
-      prepareFreshStack(root, lastExpiredTime),
-      markRootSuspendedAtTime(root, lastExpiredTime),
+  var expirationTime$jscomp$0 = expirationTime,
+    prevExecutionContext = executionContext;
+  executionContext |= RenderContext;
+  var exitStatus = pushDispatcher();
+  if (
+    root !== workInProgressRoot ||
+    expirationTime$jscomp$0 !== renderExpirationTime$1
+  )
+    prepareFreshStack(root, expirationTime$jscomp$0),
+      startWorkOnPendingInteractions(root, expirationTime$jscomp$0);
+  expirationTime$jscomp$0 = pushInteractions(root);
+  do
+    try {
+      workLoopConcurrent();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  while (1);
+  resetContextDependencies();
+  tracing.__interactionsRef.current = expirationTime$jscomp$0;
+  ReactCurrentDispatcher$1.current = exitStatus;
+  executionContext = prevExecutionContext;
+  null !== workInProgress
+    ? (exitStatus = RootIncomplete)
+    : ((workInProgressRoot = null),
+      (exitStatus = workInProgressRootExitStatus));
+  if (exitStatus !== RootIncomplete) {
+    exitStatus === RootErrored &&
+      ((expirationTime = 2 < expirationTime ? 2 : expirationTime),
+      (exitStatus = renderRootSync(root, expirationTime)));
+    if (exitStatus === RootFatalErrored)
+      throw ((didTimeout = workInProgressRootFatalError),
+      prepareFreshStack(root, expirationTime),
+      markRootSuspendedAtTime(root, expirationTime),
       ensureRootIsScheduled(root),
-      prevExecutionContext);
-    if (null !== workInProgress) throw Error(formatProdErrorMessage(261));
-    root.finishedWork = root.current.alternate;
-    root.finishedExpirationTime = lastExpiredTime;
-    workInProgressRoot = null;
-    commitRoot(root);
-    ensureRootIsScheduled(root);
+      didTimeout);
+    prevExecutionContext = root.finishedWork = root.current.alternate;
+    root.finishedExpirationTime = expirationTime;
+    switch (exitStatus) {
+      case RootIncomplete:
+      case RootFatalErrored:
+        throw Error(formatProdErrorMessage(345));
+      case RootErrored:
+        commitRoot(root);
+        break;
+      case RootSuspended:
+        markRootSuspendedAtTime(root, expirationTime);
+        exitStatus = root.lastSuspendedTime;
+        expirationTime === exitStatus &&
+          (root.nextKnownPendingLevel = getRemainingExpirationTime(
+            prevExecutionContext
+          ));
+        if (
+          1073741823 === workInProgressRootLatestProcessedExpirationTime &&
+          ((prevExecutionContext =
+            globalMostRecentFallbackTime + FALLBACK_THROTTLE_MS - now()),
+          10 < prevExecutionContext)
+        ) {
+          if (
+            workInProgressRootHasPendingPing &&
+            ((expirationTime$jscomp$0 = root.lastPingedTime),
+            0 === expirationTime$jscomp$0 ||
+              expirationTime$jscomp$0 >= expirationTime)
+          ) {
+            root.lastPingedTime = expirationTime;
+            prepareFreshStack(root, expirationTime);
+            break;
+          }
+          expirationTime$jscomp$0 = getNextRootExpirationTimeToWorkOn(root);
+          if (
+            0 !== expirationTime$jscomp$0 &&
+            expirationTime$jscomp$0 !== expirationTime
+          )
+            break;
+          if (0 !== exitStatus && exitStatus !== expirationTime) {
+            root.lastPingedTime = exitStatus;
+            break;
+          }
+          root.timeoutHandle = scheduleTimeout(
+            commitRoot.bind(null, root),
+            prevExecutionContext
+          );
+          break;
+        }
+        commitRoot(root);
+        break;
+      case RootSuspendedWithDelay:
+        markRootSuspendedAtTime(root, expirationTime);
+        exitStatus = root.lastSuspendedTime;
+        expirationTime === exitStatus &&
+          (root.nextKnownPendingLevel = getRemainingExpirationTime(
+            prevExecutionContext
+          ));
+        if (
+          workInProgressRootHasPendingPing &&
+          ((prevExecutionContext = root.lastPingedTime),
+          0 === prevExecutionContext || prevExecutionContext >= expirationTime)
+        ) {
+          root.lastPingedTime = expirationTime;
+          prepareFreshStack(root, expirationTime);
+          break;
+        }
+        prevExecutionContext = getNextRootExpirationTimeToWorkOn(root);
+        if (
+          0 !== prevExecutionContext &&
+          prevExecutionContext !== expirationTime
+        )
+          break;
+        if (0 !== exitStatus && exitStatus !== expirationTime) {
+          root.lastPingedTime = exitStatus;
+          break;
+        }
+        1073741823 !== workInProgressRootLatestSuspenseTimeout
+          ? (prevExecutionContext =
+              10 * (1073741821 - workInProgressRootLatestSuspenseTimeout) -
+              now())
+          : 1073741823 === workInProgressRootLatestProcessedExpirationTime
+          ? (prevExecutionContext = 0)
+          : ((prevExecutionContext =
+              10 *
+                (1073741821 - workInProgressRootLatestProcessedExpirationTime) -
+              5e3),
+            (exitStatus = now()),
+            (expirationTime = 10 * (1073741821 - expirationTime) - exitStatus),
+            (prevExecutionContext = exitStatus - prevExecutionContext),
+            0 > prevExecutionContext && (prevExecutionContext = 0),
+            (prevExecutionContext =
+              (120 > prevExecutionContext
+                ? 120
+                : 480 > prevExecutionContext
+                ? 480
+                : 1080 > prevExecutionContext
+                ? 1080
+                : 1920 > prevExecutionContext
+                ? 1920
+                : 3e3 > prevExecutionContext
+                ? 3e3
+                : 4320 > prevExecutionContext
+                ? 4320
+                : 1960 * ceil(prevExecutionContext / 1960)) -
+              prevExecutionContext),
+            expirationTime < prevExecutionContext &&
+              (prevExecutionContext = expirationTime));
+        if (10 < prevExecutionContext) {
+          root.timeoutHandle = scheduleTimeout(
+            commitRoot.bind(null, root),
+            prevExecutionContext
+          );
+          break;
+        }
+        commitRoot(root);
+        break;
+      case RootCompleted:
+        if (
+          1073741823 !== workInProgressRootLatestProcessedExpirationTime &&
+          null !== workInProgressRootCanSuspendUsingConfig
+        ) {
+          expirationTime$jscomp$0 = workInProgressRootLatestProcessedExpirationTime;
+          var suspenseConfig = workInProgressRootCanSuspendUsingConfig;
+          prevExecutionContext = suspenseConfig.busyMinDurationMs | 0;
+          0 >= prevExecutionContext
+            ? (prevExecutionContext = 0)
+            : ((exitStatus = suspenseConfig.busyDelayMs | 0),
+              (expirationTime$jscomp$0 =
+                now() -
+                (10 * (1073741821 - expirationTime$jscomp$0) -
+                  (suspenseConfig.timeoutMs | 0 || 5e3))),
+              (prevExecutionContext =
+                expirationTime$jscomp$0 <= exitStatus
+                  ? 0
+                  : exitStatus +
+                    prevExecutionContext -
+                    expirationTime$jscomp$0));
+          if (10 < prevExecutionContext) {
+            markRootSuspendedAtTime(root, expirationTime);
+            root.timeoutHandle = scheduleTimeout(
+              commitRoot.bind(null, root),
+              prevExecutionContext
+            );
+            break;
+          }
+        }
+        commitRoot(root);
+        break;
+      default:
+        throw Error(formatProdErrorMessage(329));
+    }
   }
+  ensureRootIsScheduled(root);
+  return root.callbackNode === didTimeout
+    ? performConcurrentWorkOnRoot.bind(null, root)
+    : null;
+}
+function performSyncWorkOnRoot(root) {
+  if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
+    throw Error(formatProdErrorMessage(327));
+  flushPassiveEffects();
+  var lastExpiredTime = root.lastExpiredTime;
+  lastExpiredTime =
+    0 !== lastExpiredTime
+      ? root === workInProgressRoot && renderExpirationTime$1 >= lastExpiredTime
+        ? renderExpirationTime$1
+        : lastExpiredTime
+      : 1073741823;
+  var exitStatus = renderRootSync(root, lastExpiredTime);
+  0 !== root.tag &&
+    exitStatus === RootErrored &&
+    ((lastExpiredTime = 2 < lastExpiredTime ? 2 : lastExpiredTime),
+    (exitStatus = renderRootSync(root, lastExpiredTime)));
+  if (exitStatus === RootFatalErrored)
+    throw ((exitStatus = workInProgressRootFatalError),
+    prepareFreshStack(root, lastExpiredTime),
+    markRootSuspendedAtTime(root, lastExpiredTime),
+    ensureRootIsScheduled(root),
+    exitStatus);
+  root.finishedWork = root.current.alternate;
+  root.finishedExpirationTime = lastExpiredTime;
+  commitRoot(root);
+  ensureRootIsScheduled(root);
   return null;
 }
 function flushRoot(root, expirationTime) {
@@ -9470,6 +9455,30 @@ function renderDidSuspendDelayIfPossible() {
       workInProgressRoot,
       workInProgressRootNextUnprocessedUpdateTime
     ));
+}
+function renderRootSync(root, expirationTime) {
+  var prevExecutionContext = executionContext;
+  executionContext |= RenderContext;
+  var prevDispatcher = pushDispatcher();
+  if (root !== workInProgressRoot || expirationTime !== renderExpirationTime$1)
+    prepareFreshStack(root, expirationTime),
+      startWorkOnPendingInteractions(root, expirationTime);
+  expirationTime = pushInteractions(root);
+  do
+    try {
+      workLoopSync();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  while (1);
+  resetContextDependencies();
+  tracing.__interactionsRef.current = expirationTime;
+  executionContext = prevExecutionContext;
+  ReactCurrentDispatcher$1.current = prevDispatcher;
+  if (null !== workInProgress) throw Error(formatProdErrorMessage(261));
+  workInProgressRoot = null;
+  return workInProgressRootExitStatus;
 }
 function workLoopSync() {
   for (; null !== workInProgress; )
@@ -11357,7 +11366,9 @@ var Internals = {
     getFiberCurrentPropsFromNode$1,
     injectEventPluginsByName,
     eventNameDispatchConfigs,
-    accumulateTwoPhaseDispatches,
+    function(events) {
+      forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
+    },
     function(events) {
       forEachAccumulated(events, accumulateDirectDispatchesSingle);
     },

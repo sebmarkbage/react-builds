@@ -136,19 +136,29 @@ var REACT_FUNDAMENTAL_TYPE = hasSymbol
   : 0xead5;
 var REACT_SCOPE_TYPE = hasSymbol ? Symbol.for("react.scope") : 0xead7;
 
+// TODO: Move this to "react" once we can import from externals.
 var Uninitialized = -1;
 var Pending = 0;
 var Resolved = 1;
 var Rejected = 2;
+
 function refineResolvedLazyComponent(lazyComponent) {
   return lazyComponent._status === Resolved ? lazyComponent._result : null;
 }
 function initializeLazyComponentType(lazyComponent) {
   if (lazyComponent._status === Uninitialized) {
-    lazyComponent._status = Pending;
-    var ctor = lazyComponent._ctor;
-    var thenable = ctor();
-    lazyComponent._result = thenable;
+    var ctor = lazyComponent._result;
+
+    if (!ctor) {
+      // TODO: Remove this later. THis only exists in case you use an older "react" package.
+      ctor = lazyComponent._ctor;
+    }
+
+    var thenable = ctor(); // Transition to the next state.
+
+    var pending = lazyComponent;
+    pending._status = Pending;
+    pending._result = thenable;
     thenable.then(
       function(moduleObject) {
         if (lazyComponent._status === Pending) {
@@ -163,16 +173,19 @@ function initializeLazyComponentType(lazyComponent) {
                 moduleObject
               );
             }
-          }
+          } // Transition to the next state.
 
-          lazyComponent._status = Resolved;
-          lazyComponent._result = defaultExport;
+          var resolved = lazyComponent;
+          resolved._status = Resolved;
+          resolved._result = defaultExport;
         }
       },
       function(error) {
         if (lazyComponent._status === Pending) {
-          lazyComponent._status = Rejected;
-          lazyComponent._result = error;
+          // Transition to the next state.
+          var rejected = lazyComponent;
+          rejected._status = Rejected;
+          rejected._result = error;
         }
       }
     );
@@ -185,6 +198,10 @@ function getWrappedName(outerType, innerType, wrapperName) {
     outerType.displayName ||
     (functionName !== "" ? wrapperName + "(" + functionName + ")" : wrapperName)
   );
+}
+
+function getContextName(type) {
+  return type.displayName || "Context";
 }
 
 function getComponentName(type) {
@@ -233,10 +250,12 @@ function getComponentName(type) {
   if (typeof type === "object") {
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        var context = type;
+        return getContextName(context) + ".Consumer";
 
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        var provider = type;
+        return getContextName(provider._context) + ".Provider";
 
       case REACT_FORWARD_REF_TYPE:
         return getWrappedName(type, type.render, "ForwardRef");

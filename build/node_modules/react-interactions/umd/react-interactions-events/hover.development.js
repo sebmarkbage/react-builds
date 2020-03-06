@@ -304,7 +304,8 @@
       }
     },
     onUnmount: unmountResponder
-  };
+  }; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
   var HoverResponder = React.DEPRECATED_createResponder('Hover', hasPointerEvents ? hoverResponderImpl : hoverResponderFallbackImpl);
   function useHover(props) {
     return React.DEPRECATED_useResponder(HoverResponder, props);

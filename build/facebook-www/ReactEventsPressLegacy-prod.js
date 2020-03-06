@@ -482,9 +482,8 @@ var PressResponder = React.DEPRECATED_createResponder("Press", {
         dispatchCancel(event, context, props, state);
         break;
       case "blur":
-        !isPressed ||
-          (null !== nativeEvent.relatedTarget &&
-            target !== state.pressTarget) ||
+        isPressed &&
+          target === state.pressTarget &&
           dispatchCancel(event, context, props, state);
     }
   },

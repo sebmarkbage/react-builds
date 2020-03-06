@@ -204,19 +204,29 @@
     return null;
   }
 
+  // TODO: Move this to "react" once we can import from externals.
   var Uninitialized = -1;
   var Pending = 0;
   var Resolved = 1;
   var Rejected = 2;
+
   function refineResolvedLazyComponent(lazyComponent) {
     return lazyComponent._status === Resolved ? lazyComponent._result : null;
   }
   function initializeLazyComponentType(lazyComponent) {
     if (lazyComponent._status === Uninitialized) {
-      lazyComponent._status = Pending;
-      var ctor = lazyComponent._ctor;
-      var thenable = ctor();
-      lazyComponent._result = thenable;
+      var ctor = lazyComponent._result;
+
+      if (!ctor) {
+        // TODO: Remove this later. THis only exists in case you use an older "react" package.
+        ctor = lazyComponent._ctor;
+      }
+
+      var thenable = ctor(); // Transition to the next state.
+
+      var pending = lazyComponent;
+      pending._status = Pending;
+      pending._result = thenable;
       thenable.then(function (moduleObject) {
         if (lazyComponent._status === Pending) {
           var defaultExport = moduleObject.default;
@@ -225,15 +235,19 @@
             if (defaultExport === undefined) {
               error('lazy: Expected the result of a dynamic import() call. ' + 'Instead received: %s\n\nYour code should look like: \n  ' + "const MyComponent = lazy(() => import('./MyComponent'))", moduleObject);
             }
-          }
+          } // Transition to the next state.
 
-          lazyComponent._status = Resolved;
-          lazyComponent._result = defaultExport;
+
+          var resolved = lazyComponent;
+          resolved._status = Resolved;
+          resolved._result = defaultExport;
         }
       }, function (error) {
         if (lazyComponent._status === Pending) {
-          lazyComponent._status = Rejected;
-          lazyComponent._result = error;
+          // Transition to the next state.
+          var rejected = lazyComponent;
+          rejected._status = Rejected;
+          rejected._result = error;
         }
       });
     }
@@ -242,6 +256,10 @@
   function getWrappedName(outerType, innerType, wrapperName) {
     var functionName = innerType.displayName || innerType.name || '';
     return outerType.displayName || (functionName !== '' ? wrapperName + "(" + functionName + ")" : wrapperName);
+  }
+
+  function getContextName(type) {
+    return type.displayName || 'Context';
   }
 
   function getComponentName(type) {
@@ -287,10 +305,12 @@
     if (typeof type === 'object') {
       switch (type.$$typeof) {
         case REACT_CONTEXT_TYPE:
-          return 'Context.Consumer';
+          var context = type;
+          return getContextName(context) + '.Consumer';
 
         case REACT_PROVIDER_TYPE:
-          return 'Context.Provider';
+          var provider = type;
+          return getContextName(provider._context) + '.Provider';
 
         case REACT_FORWARD_REF_TYPE:
           return getWrappedName(type, type.render, 'ForwardRef');
@@ -12025,7 +12045,7 @@
   function performConcurrentWorkOnRoot(root, didTimeout) {
     // Since we know we're in a React event, we can clear the current
     // event time. The next update will compute a new event time.
-    currentEventTime = NoWork;
+    currentEventTime = NoWork; // Check if the render expired.
 
     if (didTimeout) {
       // The render task took too long to complete. Mark the current time as
@@ -12041,87 +12061,59 @@
 
     var expirationTime = getNextRootExpirationTimeToWorkOn(root);
 
-    if (expirationTime !== NoWork) {
-      var originalCallbackNode = root.callbackNode;
+    if (expirationTime === NoWork) {
+      return null;
+    }
 
-      if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
-        {
-          throw Error( "Should not already be working." );
-        }
+    var originalCallbackNode = root.callbackNode;
+
+    if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
+      {
+        throw Error( "Should not already be working." );
+      }
+    }
+
+    flushPassiveEffects();
+    var exitStatus = renderRootConcurrent(root, expirationTime);
+
+    if (exitStatus !== RootIncomplete) {
+      if (exitStatus === RootErrored) {
+        // If something threw an error, try rendering one more time. We'll
+        // render synchronously to block concurrent data mutations, and we'll
+        // render at Idle (or lower) so that all pending updates are included.
+        // If it still fails after the second attempt, we'll give up and commit
+        // the resulting tree.
+        expirationTime = expirationTime > Idle ? Idle : expirationTime;
+        exitStatus = renderRootSync(root, expirationTime);
       }
 
-      flushPassiveEffects(); // If the root or expiration time have changed, throw out the existing stack
-      // and prepare a fresh one. Otherwise we'll continue where we left off.
-
-      if (root !== workInProgressRoot || expirationTime !== renderExpirationTime$1) {
+      if (exitStatus === RootFatalErrored) {
+        var fatalError = workInProgressRootFatalError;
         prepareFreshStack(root, expirationTime);
-        startWorkOnPendingInteractions(root, expirationTime);
-      } // If we have a work-in-progress fiber, it means there's still work to do
-      // in this root.
-
-
-      if (workInProgress !== null) {
-        var prevExecutionContext = executionContext;
-        executionContext |= RenderContext;
-        var prevDispatcher = pushDispatcher();
-        var prevInteractions = pushInteractions(root);
-        startWorkLoopTimer(workInProgress);
-
-        do {
-          try {
-            workLoopConcurrent();
-            break;
-          } catch (thrownValue) {
-            handleError(root, thrownValue);
-          }
-        } while (true);
-
-        resetContextDependencies();
-        executionContext = prevExecutionContext;
-        popDispatcher(prevDispatcher);
-
-        {
-          popInteractions(prevInteractions);
-        }
-
-        if (workInProgressRootExitStatus === RootFatalErrored) {
-          var fatalError = workInProgressRootFatalError;
-          stopInterruptedWorkLoopTimer();
-          prepareFreshStack(root, expirationTime);
-          markRootSuspendedAtTime(root, expirationTime);
-          ensureRootIsScheduled(root);
-          throw fatalError;
-        }
-
-        if (workInProgress !== null) {
-          // There's still work left over. Exit without committing.
-          stopInterruptedWorkLoopTimer();
-        } else {
-          // We now have a consistent tree. The next step is either to commit it,
-          // or, if something suspended, wait to commit it after a timeout.
-          stopFinishedWorkLoopTimer();
-          var finishedWork = root.finishedWork = root.current.alternate;
-          root.finishedExpirationTime = expirationTime;
-          finishConcurrentRender(root, finishedWork, workInProgressRootExitStatus, expirationTime);
-        }
-
+        markRootSuspendedAtTime(root, expirationTime);
         ensureRootIsScheduled(root);
+        throw fatalError;
+      } // We now have a consistent tree. The next step is either to commit it,
+      // or, if something suspended, wait to commit it after a timeout.
 
-        if (root.callbackNode === originalCallbackNode) {
-          // The task node scheduled for this root is the same one that's
-          // currently executed. Need to return a continuation.
-          return performConcurrentWorkOnRoot.bind(null, root);
-        }
-      }
+
+      var finishedWork = root.finishedWork = root.current.alternate;
+      root.finishedExpirationTime = expirationTime;
+      finishConcurrentRender(root, finishedWork, exitStatus, expirationTime);
+    }
+
+    ensureRootIsScheduled(root);
+
+    if (root.callbackNode === originalCallbackNode) {
+      // The task node scheduled for this root is the same one that's
+      // currently executed. Need to return a continuation.
+      return performConcurrentWorkOnRoot.bind(null, root);
     }
 
     return null;
   }
 
   function finishConcurrentRender(root, finishedWork, exitStatus, expirationTime) {
-    // Set this to null to indicate there's no in-progress render.
-    workInProgressRoot = null;
-
     switch (exitStatus) {
       case RootIncomplete:
       case RootFatalErrored:
@@ -12138,16 +12130,9 @@
 
       case RootErrored:
         {
-          // If this was an async render, the error may have happened due to
-          // a mutation in a concurrent event. Try rendering one more time,
-          // synchronously, to see if the error goes away. If there are
-          // lower priority updates, let's include those, too, in case they
-          // fix the inconsistency. Render at Idle to include all updates.
-          // If it was Idle or Never or some not-yet-invented time, render
-          // at that time.
-          markRootExpiredAtTime(root, expirationTime > Idle ? Idle : expirationTime); // We assume that this second render pass will be synchronous
-          // and therefore not hit this path again.
-
+          // We should have already attempted to retry this tree. If we reached
+          // this point, it errored again. Commit it.
+          commitRoot(root);
           break;
         }
 
@@ -12342,87 +12327,62 @@
 
 
   function performSyncWorkOnRoot(root) {
-    // Check if there's expired work on this root. Otherwise, render at Sync.
-    var lastExpiredTime = root.lastExpiredTime;
-    var expirationTime = lastExpiredTime !== NoWork ? lastExpiredTime : Sync;
-
     if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
       {
         throw Error( "Should not already be working." );
       }
     }
 
-    flushPassiveEffects(); // If the root or expiration time have changed, throw out the existing stack
-    // and prepare a fresh one. Otherwise we'll continue where we left off.
+    flushPassiveEffects();
+    var lastExpiredTime = root.lastExpiredTime;
+    var expirationTime;
 
-    if (root !== workInProgressRoot || expirationTime !== renderExpirationTime$1) {
-      prepareFreshStack(root, expirationTime);
-      startWorkOnPendingInteractions(root, expirationTime);
-    } // If we have a work-in-progress fiber, it means there's still work to do
-    // in this root.
-
-
-    if (workInProgress !== null) {
-      var prevExecutionContext = executionContext;
-      executionContext |= RenderContext;
-      var prevDispatcher = pushDispatcher();
-      var prevInteractions = pushInteractions(root);
-      startWorkLoopTimer(workInProgress);
-
-      do {
-        try {
-          workLoopSync();
-          break;
-        } catch (thrownValue) {
-          handleError(root, thrownValue);
-        }
-      } while (true);
-
-      resetContextDependencies();
-      executionContext = prevExecutionContext;
-      popDispatcher(prevDispatcher);
-
-      {
-        popInteractions(prevInteractions);
-      }
-
-      if (workInProgressRootExitStatus === RootFatalErrored) {
-        var fatalError = workInProgressRootFatalError;
-        stopInterruptedWorkLoopTimer();
-        prepareFreshStack(root, expirationTime);
-        markRootSuspendedAtTime(root, expirationTime);
-        ensureRootIsScheduled(root);
-        throw fatalError;
-      }
-
-      if (workInProgress !== null) {
-        // This is a sync render, so we should have finished the whole tree.
-        {
-          {
-            throw Error( "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue." );
-          }
-        }
+    if (lastExpiredTime !== NoWork) {
+      // There's expired work on this root. Check if we have a partial tree
+      // that we can reuse.
+      if (root === workInProgressRoot && renderExpirationTime$1 >= lastExpiredTime) {
+        // There's a partial tree with equal or greater than priority than the
+        // expired level. Finish rendering it before rendering the rest of the
+        // expired work.
+        expirationTime = renderExpirationTime$1;
       } else {
-        // We now have a consistent tree. Because this is a sync render, we
-        // will commit it even if something suspended.
-        stopFinishedWorkLoopTimer();
-        root.finishedWork = root.current.alternate;
-        root.finishedExpirationTime = expirationTime;
-        finishSyncRender(root);
-      } // Before exiting, make sure there's a callback scheduled for the next
-      // pending level.
-
-
-      ensureRootIsScheduled(root);
+        // Start a fresh tree.
+        expirationTime = lastExpiredTime;
+      }
+    } else {
+      // There's no expired work. This must be a new, synchronous render.
+      expirationTime = Sync;
     }
 
-    return null;
-  }
+    var exitStatus = renderRootSync(root, expirationTime);
 
-  function finishSyncRender(root) {
-    // Set this to null to indicate there's no in-progress render.
-    workInProgressRoot = null;
-    commitRoot(root);
+    if (root.tag !== LegacyRoot && exitStatus === RootErrored) {
+      // If something threw an error, try rendering one more time. We'll
+      // render synchronously to block concurrent data mutations, and we'll
+      // render at Idle (or lower) so that all pending updates are included.
+      // If it still fails after the second attempt, we'll give up and commit
+      // the resulting tree.
+      expirationTime = expirationTime > Idle ? Idle : expirationTime;
+      exitStatus = renderRootSync(root, expirationTime);
+    }
+
+    if (exitStatus === RootFatalErrored) {
+      var fatalError = workInProgressRootFatalError;
+      prepareFreshStack(root, expirationTime);
+      markRootSuspendedAtTime(root, expirationTime);
+      ensureRootIsScheduled(root);
+      throw fatalError;
+    } // We now have a consistent tree. Because this is a sync render, we
+    // will commit it even if something suspended.
+
+
+    root.finishedWork = root.current.alternate;
+    root.finishedExpirationTime = expirationTime;
+    commitRoot(root); // Before exiting, make sure there's a callback scheduled for the next
+    // pending level.
+
+    ensureRootIsScheduled(root);
+    return null;
   }
   function syncUpdates(fn, a, b, c) {
     return runWithPriority(ImmediatePriority, fn.bind(null, a, b, c));
@@ -12652,6 +12612,53 @@
     // that was added to the event time.
     var earliestExpirationTimeMs = expirationTimeToMs(expirationTime);
     return earliestExpirationTimeMs - (suspenseConfig.timeoutMs | 0 || LOW_PRIORITY_EXPIRATION);
+  }
+
+  function renderRootSync(root, expirationTime) {
+    var prevExecutionContext = executionContext;
+    executionContext |= RenderContext;
+    var prevDispatcher = pushDispatcher(); // If the root or expiration time have changed, throw out the existing stack
+    // and prepare a fresh one. Otherwise we'll continue where we left off.
+
+    if (root !== workInProgressRoot || expirationTime !== renderExpirationTime$1) {
+      prepareFreshStack(root, expirationTime);
+      startWorkOnPendingInteractions(root, expirationTime);
+    }
+
+    var prevInteractions = pushInteractions(root);
+    startWorkLoopTimer(workInProgress);
+
+    do {
+      try {
+        workLoopSync();
+        break;
+      } catch (thrownValue) {
+        handleError(root, thrownValue);
+      }
+    } while (true);
+
+    resetContextDependencies();
+
+    {
+      popInteractions(prevInteractions);
+    }
+
+    executionContext = prevExecutionContext;
+    popDispatcher(prevDispatcher);
+
+    if (workInProgress !== null) {
+      // This is a sync render, so we should have finished the whole tree.
+      {
+        {
+          throw Error( "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue." );
+        }
+      }
+    }
+
+    stopFinishedWorkLoopTimer(); // Set this to null to indicate there's no in-progress render.
+
+    workInProgressRoot = null;
+    return workInProgressRootExitStatus;
   } // The work loop is an extremely hot path. Tell Closure not to inline it.
 
   /** @noinline */
@@ -12661,6 +12668,52 @@
     // Already timed out, so perform work without checking if we need to yield.
     while (workInProgress !== null) {
       workInProgress = performUnitOfWork(workInProgress);
+    }
+  }
+
+  function renderRootConcurrent(root, expirationTime) {
+    var prevExecutionContext = executionContext;
+    executionContext |= RenderContext;
+    var prevDispatcher = pushDispatcher(); // If the root or expiration time have changed, throw out the existing stack
+    // and prepare a fresh one. Otherwise we'll continue where we left off.
+
+    if (root !== workInProgressRoot || expirationTime !== renderExpirationTime$1) {
+      prepareFreshStack(root, expirationTime);
+      startWorkOnPendingInteractions(root, expirationTime);
+    }
+
+    var prevInteractions = pushInteractions(root);
+    startWorkLoopTimer(workInProgress);
+
+    do {
+      try {
+        workLoopConcurrent();
+        break;
+      } catch (thrownValue) {
+        handleError(root, thrownValue);
+      }
+    } while (true);
+
+    resetContextDependencies();
+
+    {
+      popInteractions(prevInteractions);
+    }
+
+    popDispatcher(prevDispatcher);
+    executionContext = prevExecutionContext; // Check if the tree has completed.
+
+    if (workInProgress !== null) {
+      // Still work remaining.
+      stopInterruptedWorkLoopTimer();
+      return RootIncomplete;
+    } else {
+      // Completed the tree.
+      stopFinishedWorkLoopTimer(); // Set this to null to indicate there's no in-progress render.
+
+      workInProgressRoot = null; // Return the final exit status.
+
+      return workInProgressRootExitStatus;
     }
   }
   /** @noinline */

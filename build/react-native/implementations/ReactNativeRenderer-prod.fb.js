@@ -1109,9 +1109,10 @@ function getIteratorFn(maybeIterable) {
 }
 function initializeLazyComponentType(lazyComponent) {
   if (-1 === lazyComponent._status) {
-    lazyComponent._status = 0;
-    var ctor = lazyComponent._ctor;
+    var ctor = lazyComponent._result;
+    ctor || (ctor = lazyComponent._ctor);
     ctor = ctor();
+    lazyComponent._status = 0;
     lazyComponent._result = ctor;
     ctor.then(
       function(moduleObject) {
@@ -1148,9 +1149,9 @@ function getComponentName(type) {
   if ("object" === typeof type)
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        return (type.displayName || "Context") + ".Consumer";
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        return (type._context.displayName || "Context") + ".Provider";
       case REACT_FORWARD_REF_TYPE:
         var innerType = type.render;
         innerType = innerType.displayName || innerType.name || "";
@@ -5773,243 +5774,214 @@ function performConcurrentWorkOnRoot(root, didTimeout) {
     return null;
   }
   lastExpiredTime = getNextRootExpirationTimeToWorkOn(root);
-  if (0 !== lastExpiredTime) {
-    didTimeout = root.callbackNode;
-    if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
-      throw Error("Should not already be working.");
-    flushPassiveEffects();
-    (root === workInProgressRoot &&
-      lastExpiredTime === renderExpirationTime$1) ||
-      prepareFreshStack(root, lastExpiredTime);
-    if (null !== workInProgress) {
-      var prevExecutionContext = executionContext;
-      executionContext |= RenderContext;
-      var prevDispatcher = pushDispatcher();
-      do
-        try {
-          workLoopConcurrent();
-          break;
-        } catch (thrownValue) {
-          handleError(root, thrownValue);
-        }
-      while (1);
-      resetContextDependencies();
-      executionContext = prevExecutionContext;
-      ReactCurrentDispatcher$1.current = prevDispatcher;
-      if (workInProgressRootExitStatus === RootFatalErrored)
-        throw ((didTimeout = workInProgressRootFatalError),
-        prepareFreshStack(root, lastExpiredTime),
-        markRootSuspendedAtTime(root, lastExpiredTime),
-        ensureRootIsScheduled(root),
-        didTimeout);
-      if (null === workInProgress)
-        switch (
-          ((prevDispatcher = root.finishedWork = root.current.alternate),
-          (root.finishedExpirationTime = lastExpiredTime),
-          (prevExecutionContext = workInProgressRootExitStatus),
-          (workInProgressRoot = null),
-          prevExecutionContext)
-        ) {
-          case RootIncomplete:
-          case RootFatalErrored:
-            throw Error("Root did not complete. This is a bug in React.");
-          case RootErrored:
-            lastExpiredTime = 2 < lastExpiredTime ? 2 : lastExpiredTime;
-            prevExecutionContext = root.lastExpiredTime;
-            if (
-              0 === prevExecutionContext ||
-              prevExecutionContext > lastExpiredTime
-            )
-              root.lastExpiredTime = lastExpiredTime;
-            break;
-          case RootSuspended:
-            markRootSuspendedAtTime(root, lastExpiredTime);
-            prevExecutionContext = root.lastSuspendedTime;
-            lastExpiredTime === prevExecutionContext &&
-              (root.nextKnownPendingLevel = getRemainingExpirationTime(
-                prevDispatcher
-              ));
-            if (
-              1073741823 === workInProgressRootLatestProcessedExpirationTime &&
-              ((prevDispatcher =
-                globalMostRecentFallbackTime + FALLBACK_THROTTLE_MS - now()),
-              10 < prevDispatcher)
-            ) {
-              if (workInProgressRootHasPendingPing) {
-                var lastPingedTime = root.lastPingedTime;
-                if (0 === lastPingedTime || lastPingedTime >= lastExpiredTime) {
-                  root.lastPingedTime = lastExpiredTime;
-                  prepareFreshStack(root, lastExpiredTime);
-                  break;
-                }
-              }
-              lastPingedTime = getNextRootExpirationTimeToWorkOn(root);
-              if (0 !== lastPingedTime && lastPingedTime !== lastExpiredTime)
-                break;
-              if (
-                0 !== prevExecutionContext &&
-                prevExecutionContext !== lastExpiredTime
-              ) {
-                root.lastPingedTime = prevExecutionContext;
-                break;
-              }
-              root.timeoutHandle = scheduleTimeout(
-                commitRoot.bind(null, root),
-                prevDispatcher
-              );
-              break;
-            }
-            commitRoot(root);
-            break;
-          case RootSuspendedWithDelay:
-            markRootSuspendedAtTime(root, lastExpiredTime);
-            prevExecutionContext = root.lastSuspendedTime;
-            lastExpiredTime === prevExecutionContext &&
-              (root.nextKnownPendingLevel = getRemainingExpirationTime(
-                prevDispatcher
-              ));
-            if (
-              workInProgressRootHasPendingPing &&
-              ((prevDispatcher = root.lastPingedTime),
-              0 === prevDispatcher || prevDispatcher >= lastExpiredTime)
-            ) {
-              root.lastPingedTime = lastExpiredTime;
-              prepareFreshStack(root, lastExpiredTime);
-              break;
-            }
-            prevDispatcher = getNextRootExpirationTimeToWorkOn(root);
-            if (0 !== prevDispatcher && prevDispatcher !== lastExpiredTime)
-              break;
-            if (
-              0 !== prevExecutionContext &&
-              prevExecutionContext !== lastExpiredTime
-            ) {
-              root.lastPingedTime = prevExecutionContext;
-              break;
-            }
-            1073741823 !== workInProgressRootLatestSuspenseTimeout
-              ? (prevExecutionContext =
-                  10 * (1073741821 - workInProgressRootLatestSuspenseTimeout) -
-                  now())
-              : 1073741823 === workInProgressRootLatestProcessedExpirationTime
-              ? (prevExecutionContext = 0)
-              : ((prevExecutionContext =
-                  10 *
-                    (1073741821 -
-                      workInProgressRootLatestProcessedExpirationTime) -
-                  5e3),
-                (prevDispatcher = now()),
-                (lastExpiredTime =
-                  10 * (1073741821 - lastExpiredTime) - prevDispatcher),
-                (prevExecutionContext = prevDispatcher - prevExecutionContext),
-                0 > prevExecutionContext && (prevExecutionContext = 0),
-                (prevExecutionContext =
-                  (120 > prevExecutionContext
-                    ? 120
-                    : 480 > prevExecutionContext
-                    ? 480
-                    : 1080 > prevExecutionContext
-                    ? 1080
-                    : 1920 > prevExecutionContext
-                    ? 1920
-                    : 3e3 > prevExecutionContext
-                    ? 3e3
-                    : 4320 > prevExecutionContext
-                    ? 4320
-                    : 1960 * ceil(prevExecutionContext / 1960)) -
-                  prevExecutionContext),
-                lastExpiredTime < prevExecutionContext &&
-                  (prevExecutionContext = lastExpiredTime));
-            if (10 < prevExecutionContext) {
-              root.timeoutHandle = scheduleTimeout(
-                commitRoot.bind(null, root),
-                prevExecutionContext
-              );
-              break;
-            }
-            commitRoot(root);
-            break;
-          case RootCompleted:
-            if (
-              1073741823 !== workInProgressRootLatestProcessedExpirationTime &&
-              null !== workInProgressRootCanSuspendUsingConfig
-            ) {
-              lastPingedTime = workInProgressRootLatestProcessedExpirationTime;
-              var suspenseConfig = workInProgressRootCanSuspendUsingConfig;
-              prevExecutionContext = suspenseConfig.busyMinDurationMs | 0;
-              0 >= prevExecutionContext
-                ? (prevExecutionContext = 0)
-                : ((prevDispatcher = suspenseConfig.busyDelayMs | 0),
-                  (lastPingedTime =
-                    now() -
-                    (10 * (1073741821 - lastPingedTime) -
-                      (suspenseConfig.timeoutMs | 0 || 5e3))),
-                  (prevExecutionContext =
-                    lastPingedTime <= prevDispatcher
-                      ? 0
-                      : prevDispatcher +
-                        prevExecutionContext -
-                        lastPingedTime));
-              if (10 < prevExecutionContext) {
-                markRootSuspendedAtTime(root, lastExpiredTime);
-                root.timeoutHandle = scheduleTimeout(
-                  commitRoot.bind(null, root),
-                  prevExecutionContext
-                );
-                break;
-              }
-            }
-            commitRoot(root);
-            break;
-          default:
-            throw Error("Unknown root exit status.");
-        }
-      ensureRootIsScheduled(root);
-      if (root.callbackNode === didTimeout)
-        return performConcurrentWorkOnRoot.bind(null, root);
-    }
-  }
-  return null;
-}
-function performSyncWorkOnRoot(root) {
-  var lastExpiredTime = root.lastExpiredTime;
-  lastExpiredTime = 0 !== lastExpiredTime ? lastExpiredTime : 1073741823;
+  if (0 === lastExpiredTime) return null;
+  didTimeout = root.callbackNode;
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
     throw Error("Should not already be working.");
   flushPassiveEffects();
-  (root === workInProgressRoot && lastExpiredTime === renderExpirationTime$1) ||
-    prepareFreshStack(root, lastExpiredTime);
-  if (null !== workInProgress) {
-    var prevExecutionContext = executionContext;
-    executionContext |= RenderContext;
-    var prevDispatcher = pushDispatcher();
-    do
-      try {
-        workLoopSync();
-        break;
-      } catch (thrownValue) {
-        handleError(root, thrownValue);
-      }
-    while (1);
-    resetContextDependencies();
-    executionContext = prevExecutionContext;
-    ReactCurrentDispatcher$1.current = prevDispatcher;
-    if (workInProgressRootExitStatus === RootFatalErrored)
-      throw ((prevExecutionContext = workInProgressRootFatalError),
+  var expirationTime = lastExpiredTime;
+  var exitStatus = executionContext;
+  executionContext |= RenderContext;
+  var prevDispatcher = pushDispatcher();
+  (root === workInProgressRoot && expirationTime === renderExpirationTime$1) ||
+    prepareFreshStack(root, expirationTime);
+  do
+    try {
+      workLoopConcurrent();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  while (1);
+  resetContextDependencies();
+  ReactCurrentDispatcher$1.current = prevDispatcher;
+  executionContext = exitStatus;
+  null !== workInProgress
+    ? (exitStatus = RootIncomplete)
+    : ((workInProgressRoot = null),
+      (exitStatus = workInProgressRootExitStatus));
+  if (exitStatus !== RootIncomplete) {
+    exitStatus === RootErrored &&
+      ((lastExpiredTime = 2 < lastExpiredTime ? 2 : lastExpiredTime),
+      (exitStatus = renderRootSync(root, lastExpiredTime)));
+    if (exitStatus === RootFatalErrored)
+      throw ((didTimeout = workInProgressRootFatalError),
       prepareFreshStack(root, lastExpiredTime),
       markRootSuspendedAtTime(root, lastExpiredTime),
       ensureRootIsScheduled(root),
-      prevExecutionContext);
-    if (null !== workInProgress)
-      throw Error(
-        "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue."
-      );
-    root.finishedWork = root.current.alternate;
+      didTimeout);
+    expirationTime = root.finishedWork = root.current.alternate;
     root.finishedExpirationTime = lastExpiredTime;
-    workInProgressRoot = null;
-    commitRoot(root);
-    ensureRootIsScheduled(root);
+    switch (exitStatus) {
+      case RootIncomplete:
+      case RootFatalErrored:
+        throw Error("Root did not complete. This is a bug in React.");
+      case RootErrored:
+        commitRoot(root);
+        break;
+      case RootSuspended:
+        markRootSuspendedAtTime(root, lastExpiredTime);
+        exitStatus = root.lastSuspendedTime;
+        lastExpiredTime === exitStatus &&
+          (root.nextKnownPendingLevel = getRemainingExpirationTime(
+            expirationTime
+          ));
+        if (
+          1073741823 === workInProgressRootLatestProcessedExpirationTime &&
+          ((expirationTime =
+            globalMostRecentFallbackTime + FALLBACK_THROTTLE_MS - now()),
+          10 < expirationTime)
+        ) {
+          if (
+            workInProgressRootHasPendingPing &&
+            ((prevDispatcher = root.lastPingedTime),
+            0 === prevDispatcher || prevDispatcher >= lastExpiredTime)
+          ) {
+            root.lastPingedTime = lastExpiredTime;
+            prepareFreshStack(root, lastExpiredTime);
+            break;
+          }
+          prevDispatcher = getNextRootExpirationTimeToWorkOn(root);
+          if (0 !== prevDispatcher && prevDispatcher !== lastExpiredTime) break;
+          if (0 !== exitStatus && exitStatus !== lastExpiredTime) {
+            root.lastPingedTime = exitStatus;
+            break;
+          }
+          root.timeoutHandle = scheduleTimeout(
+            commitRoot.bind(null, root),
+            expirationTime
+          );
+          break;
+        }
+        commitRoot(root);
+        break;
+      case RootSuspendedWithDelay:
+        markRootSuspendedAtTime(root, lastExpiredTime);
+        exitStatus = root.lastSuspendedTime;
+        lastExpiredTime === exitStatus &&
+          (root.nextKnownPendingLevel = getRemainingExpirationTime(
+            expirationTime
+          ));
+        if (
+          workInProgressRootHasPendingPing &&
+          ((expirationTime = root.lastPingedTime),
+          0 === expirationTime || expirationTime >= lastExpiredTime)
+        ) {
+          root.lastPingedTime = lastExpiredTime;
+          prepareFreshStack(root, lastExpiredTime);
+          break;
+        }
+        expirationTime = getNextRootExpirationTimeToWorkOn(root);
+        if (0 !== expirationTime && expirationTime !== lastExpiredTime) break;
+        if (0 !== exitStatus && exitStatus !== lastExpiredTime) {
+          root.lastPingedTime = exitStatus;
+          break;
+        }
+        1073741823 !== workInProgressRootLatestSuspenseTimeout
+          ? (expirationTime =
+              10 * (1073741821 - workInProgressRootLatestSuspenseTimeout) -
+              now())
+          : 1073741823 === workInProgressRootLatestProcessedExpirationTime
+          ? (expirationTime = 0)
+          : ((expirationTime =
+              10 *
+                (1073741821 - workInProgressRootLatestProcessedExpirationTime) -
+              5e3),
+            (exitStatus = now()),
+            (lastExpiredTime =
+              10 * (1073741821 - lastExpiredTime) - exitStatus),
+            (expirationTime = exitStatus - expirationTime),
+            0 > expirationTime && (expirationTime = 0),
+            (expirationTime =
+              (120 > expirationTime
+                ? 120
+                : 480 > expirationTime
+                ? 480
+                : 1080 > expirationTime
+                ? 1080
+                : 1920 > expirationTime
+                ? 1920
+                : 3e3 > expirationTime
+                ? 3e3
+                : 4320 > expirationTime
+                ? 4320
+                : 1960 * ceil(expirationTime / 1960)) - expirationTime),
+            lastExpiredTime < expirationTime &&
+              (expirationTime = lastExpiredTime));
+        if (10 < expirationTime) {
+          root.timeoutHandle = scheduleTimeout(
+            commitRoot.bind(null, root),
+            expirationTime
+          );
+          break;
+        }
+        commitRoot(root);
+        break;
+      case RootCompleted:
+        if (
+          1073741823 !== workInProgressRootLatestProcessedExpirationTime &&
+          null !== workInProgressRootCanSuspendUsingConfig
+        ) {
+          prevDispatcher = workInProgressRootLatestProcessedExpirationTime;
+          var suspenseConfig = workInProgressRootCanSuspendUsingConfig;
+          expirationTime = suspenseConfig.busyMinDurationMs | 0;
+          0 >= expirationTime
+            ? (expirationTime = 0)
+            : ((exitStatus = suspenseConfig.busyDelayMs | 0),
+              (prevDispatcher =
+                now() -
+                (10 * (1073741821 - prevDispatcher) -
+                  (suspenseConfig.timeoutMs | 0 || 5e3))),
+              (expirationTime =
+                prevDispatcher <= exitStatus
+                  ? 0
+                  : exitStatus + expirationTime - prevDispatcher));
+          if (10 < expirationTime) {
+            markRootSuspendedAtTime(root, lastExpiredTime);
+            root.timeoutHandle = scheduleTimeout(
+              commitRoot.bind(null, root),
+              expirationTime
+            );
+            break;
+          }
+        }
+        commitRoot(root);
+        break;
+      default:
+        throw Error("Unknown root exit status.");
+    }
   }
+  ensureRootIsScheduled(root);
+  return root.callbackNode === didTimeout
+    ? performConcurrentWorkOnRoot.bind(null, root)
+    : null;
+}
+function performSyncWorkOnRoot(root) {
+  if ((executionContext & (RenderContext | CommitContext)) !== NoContext)
+    throw Error("Should not already be working.");
+  flushPassiveEffects();
+  var lastExpiredTime = root.lastExpiredTime;
+  lastExpiredTime =
+    0 !== lastExpiredTime
+      ? root === workInProgressRoot && renderExpirationTime$1 >= lastExpiredTime
+        ? renderExpirationTime$1
+        : lastExpiredTime
+      : 1073741823;
+  var exitStatus = renderRootSync(root, lastExpiredTime);
+  0 !== root.tag &&
+    exitStatus === RootErrored &&
+    ((lastExpiredTime = 2 < lastExpiredTime ? 2 : lastExpiredTime),
+    (exitStatus = renderRootSync(root, lastExpiredTime)));
+  if (exitStatus === RootFatalErrored)
+    throw ((exitStatus = workInProgressRootFatalError),
+    prepareFreshStack(root, lastExpiredTime),
+    markRootSuspendedAtTime(root, lastExpiredTime),
+    ensureRootIsScheduled(root),
+    exitStatus);
+  root.finishedWork = root.current.alternate;
+  root.finishedExpirationTime = lastExpiredTime;
+  commitRoot(root);
+  ensureRootIsScheduled(root);
   return null;
 }
 function prepareFreshStack(root, expirationTime) {
@@ -6247,6 +6219,30 @@ function markRenderEventTimeAndConfig(expirationTime, suspenseConfig) {
 function markUnprocessedUpdateTime(expirationTime) {
   expirationTime > workInProgressRootNextUnprocessedUpdateTime &&
     (workInProgressRootNextUnprocessedUpdateTime = expirationTime);
+}
+function renderRootSync(root, expirationTime) {
+  var prevExecutionContext = executionContext;
+  executionContext |= RenderContext;
+  var prevDispatcher = pushDispatcher();
+  (root === workInProgressRoot && expirationTime === renderExpirationTime$1) ||
+    prepareFreshStack(root, expirationTime);
+  do
+    try {
+      workLoopSync();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  while (1);
+  resetContextDependencies();
+  executionContext = prevExecutionContext;
+  ReactCurrentDispatcher$1.current = prevDispatcher;
+  if (null !== workInProgress)
+    throw Error(
+      "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue."
+    );
+  workInProgressRoot = null;
+  return workInProgressRootExitStatus;
 }
 function workLoopSync() {
   for (; null !== workInProgress; )

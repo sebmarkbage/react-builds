@@ -507,7 +507,7 @@ exports.jsx = jsx;
 exports.jsxDEV = void 0;
 exports.jsxs = jsx;
 exports.lazy = function(ctor) {
-  return { $$typeof: REACT_LAZY_TYPE, _ctor: ctor, _status: -1, _result: null };
+  return { $$typeof: REACT_LAZY_TYPE, _status: -1, _result: ctor };
 };
 exports.memo = function(type, compare) {
   return {

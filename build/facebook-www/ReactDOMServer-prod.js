@@ -50,9 +50,10 @@ var hasSymbol = "function" === typeof Symbol && Symbol.for,
   REACT_SCOPE_TYPE = hasSymbol ? Symbol.for("react.scope") : 60119;
 function initializeLazyComponentType(lazyComponent) {
   if (-1 === lazyComponent._status) {
-    lazyComponent._status = 0;
-    var ctor = lazyComponent._ctor;
+    var ctor = lazyComponent._result;
+    ctor || (ctor = lazyComponent._ctor);
     ctor = ctor();
+    lazyComponent._status = 0;
     lazyComponent._result = ctor;
     ctor.then(
       function(moduleObject) {
@@ -89,9 +90,9 @@ function getComponentName(type) {
   if ("object" === typeof type)
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        return (type.displayName || "Context") + ".Consumer";
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        return (type._context.displayName || "Context") + ".Provider";
       case REACT_FORWARD_REF_TYPE:
         var innerType = type.render;
         innerType = innerType.displayName || innerType.name || "";

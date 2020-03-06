@@ -730,13 +730,9 @@
 
         case 'blur':
           {
-            // If we encounter a blur event that moves focus to
-            // the window, then the relatedTarget will be null.
-            // In this case, we should cancel the active press.
-            // Alternatively, if the blur target matches the
-            // current pressed target, we should also cancel
-            // the active press.
-            if (isPressed && (nativeEvent.relatedTarget === null || target === state.pressTarget)) {
+            // If we encounter a blur that happens on the pressed target
+            // then disengage the blur.
+            if (isPressed && target === state.pressTarget) {
               dispatchCancel(event, context, props, state);
             }
           }
@@ -745,7 +741,8 @@
     onUnmount: function (context, props, state) {
       unmountResponder(context, props, state);
     }
-  };
+  }; // $FlowFixMe Can't add generic types without causing a parsing/syntax errors
+
   var PressResponder = React.DEPRECATED_createResponder('Press', pressResponderImpl);
   function usePress(props) {
     return React.DEPRECATED_useResponder(PressResponder, props);

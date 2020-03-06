@@ -86,17 +86,60 @@
     return typeOf(object) === REACT_MEMO_TYPE;
   }
 
-  var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
+  /** @license ReactShallowRenderer v16.13.0
+   * react-shallow-renderer.js
+   *
+   * Copyright (c) Facebook, Inc. and its affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+  var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
+  function describeComponentFrame (name, source, ownerName) {
+    var sourceInfo = '';
+
+    if (source) {
+      var path = source.fileName;
+      var fileName = path.replace(BEFORE_SLASH_RE, '');
+
+      {
+        // In DEV, include code for a common special case:
+        // prefer "folder/index.js" instead of just "index.js".
+        if (/^index\./.test(fileName)) {
+          var match = path.match(BEFORE_SLASH_RE);
+
+          if (match) {
+            var pathBeforeSlash = match[1];
+
+            if (pathBeforeSlash) {
+              var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, '');
+              fileName = folderName + '/' + fileName;
+            }
+          }
+        }
+      }
+
+      sourceInfo = ' (at ' + fileName + ':' + source.lineNumber + ')';
+    } else if (ownerName) {
+      sourceInfo = ' (created by ' + ownerName + ')';
+    }
+
+    return '\n    in ' + (name || 'Unknown') + sourceInfo;
+  }
+
+  var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+  var hasOwnProperty = Object.prototype.hasOwnProperty; // Prevent newer renderers from RTE when used with older react package versions.
   // Current owner and dispatcher used to share the same ref,
   // but PR #14548 split them out to better support the react-debug-tools package.
 
-  if (!ReactSharedInternals.hasOwnProperty('ReactCurrentDispatcher')) {
+  if (!hasOwnProperty.call(ReactSharedInternals, 'ReactCurrentDispatcher')) {
     ReactSharedInternals.ReactCurrentDispatcher = {
       current: null
     };
   }
 
-  if (!ReactSharedInternals.hasOwnProperty('ReactCurrentBatchConfig')) {
+  if (!hasOwnProperty.call(ReactSharedInternals, 'ReactCurrentBatchConfig')) {
     ReactSharedInternals.ReactCurrentBatchConfig = {
       suspense: null
     };
@@ -113,8 +156,6 @@
   }
 
   function printWarning(level, format, args) {
-    // When changing this logic, you might want to also
-    // update consoleWithStackDev.www.js as well.
     {
       var hasExistingStack = args.length > 0 && typeof args[args.length - 1] === 'string' && args[args.length - 1].indexOf('\n    in') === 0;
 
@@ -134,120 +175,7 @@
 
       argsWithFormat.unshift('Warning: ' + format); // We intentionally don't use spread (or .apply) directly because it
       // breaks IE9: https://github.com/facebook/react/issues/13610
-      // eslint-disable-next-line react-internal/no-production-logging
-
-      Function.prototype.apply.call(console[level], console, argsWithFormat);
-
-      try {
-        // --- Welcome to debugging React ---
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        var argIndex = 0;
-        var message = 'Warning: ' + format.replace(/%s/g, function () {
-          return args[argIndex++];
-        });
-        throw new Error(message);
-      } catch (x) {}
-    }
-  }
-
-  var loggedTypeFailures = {};
-  function checkPropTypes(typeSpecs, values, location, componentName) {
-    {
-      // $FlowFixMe This is okay but Flow doesn't know it.
-      var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-      for (var typeSpecName in typeSpecs) {
-        if (has(typeSpecs, typeSpecName)) {
-          var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
-          // fail the render phase where it didn't fail before. So we log it.
-          // After these have been cleaned up, we'll let them throw.
-
-          try {
-            // This is intentionally an invariant that gets caught. It's the same
-            // behavior as without this statement except with a better message.
-            if (typeof typeSpecs[typeSpecName] !== 'function') {
-              var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' + 'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.');
-              err.name = 'Invariant Violation';
-              throw err;
-            }
-
-            error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
-          } catch (ex) {
-            error$1 = ex;
-          }
-
-          if (error$1 && !(error$1 instanceof Error)) {
-            error('%s: type specification of %s' + ' `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error$1);
-          }
-
-          if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
-            // Only monitor this failure once because there tends to be a lot of the
-            // same error.
-            loggedTypeFailures[error$1.message] = true;
-
-            error('Failed %s type: %s', location, error$1.message);
-          }
-        }
-      }
-    }
-  }
-
-  /** @license ReactShallowRenderer v16.12.0
-   * react-shallow-renderer.js
-   *
-   * Copyright (c) Facebook, Inc. and its affiliates.
-   *
-   * This source code is licensed under the MIT license found in the
-   * LICENSE file in the root directory of this source tree.
-   */
-
-  var ReactSharedInternals$1 = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Prevent newer renderers from RTE when used with older react package versions.
-  // Current owner and dispatcher used to share the same ref,
-  // but PR #14548 split them out to better support the react-debug-tools package.
-
-  if (!ReactSharedInternals$1.hasOwnProperty('ReactCurrentDispatcher')) {
-    ReactSharedInternals$1.ReactCurrentDispatcher = {
-      current: null
-    };
-  }
-
-  if (!ReactSharedInternals$1.hasOwnProperty('ReactCurrentBatchConfig')) {
-    ReactSharedInternals$1.ReactCurrentBatchConfig = {
-      suspense: null
-    };
-  }
-
-  function error$1(format) {
-    {
-      for (var _len2 = arguments.length, args = new Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
-        args[_key2 - 1] = arguments[_key2];
-      }
-
-      printWarning$1('error', format, args);
-    }
-  }
-
-  function printWarning$1(level, format, args) {
-    {
-      var hasExistingStack = args.length > 0 && typeof args[args.length - 1] === 'string' && args[args.length - 1].indexOf('\n    in') === 0;
-
-      if (!hasExistingStack) {
-        var ReactDebugCurrentFrame = ReactSharedInternals$1.ReactDebugCurrentFrame;
-        var stack = ReactDebugCurrentFrame.getStackAddendum();
-
-        if (stack !== '') {
-          format += '%s';
-          args = args.concat([stack]);
-        }
-      }
-
-      var argsWithFormat = args.map(function (item) {
-        return '' + item;
-      }); // Careful: RN currently depends on this prefix
-
-      argsWithFormat.unshift('Warning: ' + format); // We intentionally don't use spread (or .apply) directly because it
-      // breaks IE9: https://github.com/facebook/react/issues/13610
+      // eslint-disable-next-line no-console
 
       Function.prototype.apply.call(console[level], console, argsWithFormat);
 
@@ -298,7 +226,7 @@
 
     {
       if (typeof type.tag === 'number') {
-        error$1('Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
+        error('Received an unexpected object in getComponentName(). ' + 'This is likely a bug in React. Please file an issue.');
       }
     }
 
@@ -375,7 +303,7 @@
 
   var objectIs = typeof Object.is === 'function' ? Object.is : is;
 
-  var hasOwnProperty = Object.prototype.hasOwnProperty;
+  var hasOwnProperty$1 = Object.prototype.hasOwnProperty;
   /**
    * Performs equality by iterating through keys on an object and returning false
    * when any key has values which are not strictly equal between the arguments.
@@ -400,7 +328,7 @@
 
 
     for (var i = 0; i < keysA.length; i++) {
-      if (!hasOwnProperty.call(objB, keysA[i]) || !objectIs(objA[keysA[i]], objB[keysA[i]])) {
+      if (!hasOwnProperty$1.call(objB, keysA[i]) || !objectIs(objA[keysA[i]], objB[keysA[i]])) {
         return false;
       }
     }
@@ -408,7 +336,48 @@
     return true;
   }
 
-  var ReactCurrentDispatcher = ReactSharedInternals$1.ReactCurrentDispatcher;
+  var loggedTypeFailures = {};
+  function checkPropTypes(typeSpecs, values, location, componentName) {
+    {
+      var has = Function.call.bind(Object.prototype.hasOwnProperty);
+
+      for (var typeSpecName in typeSpecs) {
+        if (has(typeSpecs, typeSpecName)) {
+          var error$1 = void 0; // Prop type validation may throw. In case they do, we don't want to
+          // fail the render phase where it didn't fail before. So we log it.
+          // After these have been cleaned up, we'll let them throw.
+
+          try {
+            // This is intentionally an invariant that gets caught. It's the same
+            // behavior as without this statement except with a better message.
+            if (typeof typeSpecs[typeSpecName] !== 'function') {
+              var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.' + 'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.');
+              err.name = 'Invariant Violation';
+              throw err;
+            }
+
+            error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
+          } catch (ex) {
+            error$1 = ex;
+          }
+
+          if (error$1 && !(error$1 instanceof Error)) {
+            error('%s: type specification of %s' + ' `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', location, typeSpecName, typeof error$1);
+          }
+
+          if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
+            // Only monitor this failure once because there tends to be a lot of the
+            // same error.
+            loggedTypeFailures[error$1.message] = true;
+            error('Failed %s type: %s', location, error$1.message);
+          }
+        }
+      }
+    }
+  }
+
+  var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher,
+      ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
   var RE_RENDER_LIMIT = 25;
   var emptyObject = {};
 
@@ -422,7 +391,7 @@
   function areHookInputsEqual(nextDeps, prevDeps) {
     if (prevDeps === null) {
       {
-        error$1('%s received a final argument during this render, but not during ' + 'the previous render. Even though the final argument is optional, ' + 'its type cannot change between renders.', currentHookNameInDev);
+        error('%s received a final argument during this render, but not during ' + 'the previous render. Even though the final argument is optional, ' + 'its type cannot change between renders.', currentHookNameInDev);
       }
 
       return false;
@@ -432,7 +401,7 @@
       // Don't bother comparing lengths in prod because these arrays should be
       // passed inline.
       if (nextDeps.length !== prevDeps.length) {
-        error$1('The final argument passed to %s changed size between renders. The ' + 'order and size of this array must remain constant.\n\n' + 'Previous: %s\n' + 'Incoming: %s', currentHookNameInDev, "[" + nextDeps.join(', ') + "]", "[" + prevDeps.join(', ') + "]");
+        error('The final argument passed to %s changed size between renders. The ' + 'order and size of this array must remain constant.\n\n' + 'Previous: %s\n' + 'Incoming: %s', currentHookNameInDev, "[" + nextDeps.join(', ') + "]", "[" + prevDeps.join(', ') + "]");
       }
     }
 
@@ -447,9 +416,7 @@
     return true;
   }
 
-  var Updater =
-  /*#__PURE__*/
-  function () {
+  var Updater = /*#__PURE__*/function () {
     function Updater(renderer) {
       this._renderer = renderer;
       this._callbacks = [];
@@ -530,9 +497,7 @@
     return typeof action === 'function' ? action(state) : action;
   }
 
-  var ReactShallowRenderer =
-  /*#__PURE__*/
-  function () {
+  var ReactShallowRenderer = /*#__PURE__*/function () {
     function ReactShallowRenderer() {
       this._reset();
     }
@@ -893,63 +858,79 @@
       this._element = element;
       this._context = getMaskedContext(elementType.contextTypes, context); // Inner memo component props aren't currently validated in createElement.
 
-      if (isMemo(element) && elementType.propTypes) {
-        checkPropTypes(elementType.propTypes, element.props, 'prop', getComponentName(elementType));
+      var prevGetStack;
+
+      {
+        prevGetStack = ReactDebugCurrentFrame.getCurrentStack;
+        ReactDebugCurrentFrame.getCurrentStack = getStackAddendum;
       }
 
-      if (this._instance) {
-        this._updateClassComponent(elementType, element, this._context);
-      } else {
-        if (shouldConstruct(elementType)) {
-          this._instance = new elementType(element.props, this._context, this._updater);
+      try {
+        if (isMemo(element) && elementType.propTypes) {
+          currentlyValidatingElement = element;
+          checkPropTypes(elementType.propTypes, element.props, 'prop', getComponentName(elementType));
+        }
 
-          if (typeof elementType.getDerivedStateFromProps === 'function') {
-            var partialState = elementType.getDerivedStateFromProps.call(null, element.props, this._instance.state);
-
-            if (partialState != null) {
-              this._instance.state = _assign({}, this._instance.state, partialState);
-            }
-          }
-
-          if (elementType.contextTypes) {
-            checkPropTypes(elementType.contextTypes, this._context, 'context', getName(elementType, this._instance));
-          }
-
-          this._mountClassComponent(elementType, element, this._context);
+        if (this._instance) {
+          this._updateClassComponent(elementType, element, this._context);
         } else {
-          var shouldRender = true;
+          if (shouldConstruct(elementType)) {
+            this._instance = new elementType(element.props, this._context, this._updater);
 
-          if (isMemo(element) && previousElement !== null) {
-            // This is a Memo component that is being re-rendered.
-            var compare = element.type.compare || shallowEqual;
+            if (typeof elementType.getDerivedStateFromProps === 'function') {
+              var partialState = elementType.getDerivedStateFromProps.call(null, element.props, this._instance.state);
 
-            if (compare(previousElement.props, element.props)) {
-              shouldRender = false;
-            }
-          }
-
-          if (shouldRender) {
-            var prevDispatcher = ReactCurrentDispatcher.current;
-            ReactCurrentDispatcher.current = this._dispatcher;
-
-            try {
-              // elementType could still be a ForwardRef if it was
-              // nested inside Memo.
-              if (elementType.$$typeof === ForwardRef) {
-                if (!(typeof elementType.render === 'function')) {
-                  throw Error("forwardRef requires a render function but was given " + typeof elementType.render + ".");
-                }
-
-                this._rendered = elementType.render.call(undefined, element.props, element.ref);
-              } else {
-                this._rendered = elementType(element.props, this._context);
+              if (partialState != null) {
+                this._instance.state = _assign({}, this._instance.state, partialState);
               }
-            } finally {
-              ReactCurrentDispatcher.current = prevDispatcher;
             }
 
-            this._finishHooks(element, context);
+            if (elementType.contextTypes) {
+              currentlyValidatingElement = element;
+              checkPropTypes(elementType.contextTypes, this._context, 'context', getName(elementType, this._instance));
+              currentlyValidatingElement = null;
+            }
+
+            this._mountClassComponent(elementType, element, this._context);
+          } else {
+            var shouldRender = true;
+
+            if (isMemo(element) && previousElement !== null) {
+              // This is a Memo component that is being re-rendered.
+              var compare = element.type.compare || shallowEqual;
+
+              if (compare(previousElement.props, element.props)) {
+                shouldRender = false;
+              }
+            }
+
+            if (shouldRender) {
+              var prevDispatcher = ReactCurrentDispatcher.current;
+              ReactCurrentDispatcher.current = this._dispatcher;
+
+              try {
+                // elementType could still be a ForwardRef if it was
+                // nested inside Memo.
+                if (elementType.$$typeof === ForwardRef) {
+                  if (!(typeof elementType.render === 'function')) {
+                    throw Error("forwardRef requires a render function but was given " + typeof elementType.render + ".");
+                  }
+
+                  this._rendered = elementType.render.call(undefined, element.props, element.ref);
+                } else {
+                  this._rendered = elementType(element.props, this._context);
+                }
+              } finally {
+                ReactCurrentDispatcher.current = prevDispatcher;
+              }
+
+              this._finishHooks(element, context);
+            }
           }
+        }
+      } finally {
+        {
+          ReactDebugCurrentFrame.getCurrentStack = prevGetStack;
         }
       }
 
@@ -1073,6 +1054,33 @@
   ReactShallowRenderer.createRenderer = function () {
     return new ReactShallowRenderer();
   };
+
+  var currentlyValidatingElement = null;
+
+  function getDisplayName(element) {
+    if (element == null) {
+      return '#empty';
+    } else if (typeof element === 'string' || typeof element === 'number') {
+      return '#text';
+    } else if (typeof element.type === 'string') {
+      return element.type;
+    } else {
+      var elementType = isMemo(element) ? element.type.type : element.type;
+      return elementType.displayName || elementType.name || 'Unknown';
+    }
+  }
+
+  function getStackAddendum() {
+    var stack = '';
+
+    if (currentlyValidatingElement) {
+      var name = getDisplayName(currentlyValidatingElement);
+      var owner = currentlyValidatingElement._owner;
+      stack += describeComponentFrame(name, currentlyValidatingElement._source, owner && getComponentName(owner.type));
+    }
+
+    return stack;
+  }
 
   function getName(type, instance) {
     var constructor = instance && instance.constructor;

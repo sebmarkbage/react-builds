@@ -148,7 +148,9 @@
     return '\n    in ' + (name || 'Unknown') + sourceInfo;
   }
 
+  // TODO: Move this to "react" once we can import from externals.
   var Resolved = 1;
+
   function refineResolvedLazyComponent(lazyComponent) {
     return lazyComponent._status === Resolved ? lazyComponent._result : null;
   }
@@ -156,6 +158,10 @@
   function getWrappedName(outerType, innerType, wrapperName) {
     var functionName = innerType.displayName || innerType.name || '';
     return outerType.displayName || (functionName !== '' ? wrapperName + "(" + functionName + ")" : wrapperName);
+  }
+
+  function getContextName(type) {
+    return type.displayName || 'Context';
   }
 
   function getComponentName(type) {
@@ -201,10 +207,12 @@
     if (typeof type === 'object') {
       switch (type.$$typeof) {
         case REACT_CONTEXT_TYPE:
-          return 'Context.Consumer';
+          var context = type;
+          return getContextName(context) + '.Consumer';
 
         case REACT_PROVIDER_TYPE:
-          return 'Context.Provider';
+          var provider = type;
+          return getContextName(provider._context) + '.Provider';
 
         case REACT_FORWARD_REF_TYPE:
           return getWrappedName(type, type.render, 'ForwardRef');
@@ -745,6 +753,70 @@
 
     return element;
   };
+  /**
+   * https://github.com/reactjs/rfcs/pull/107
+   * @param {*} type
+   * @param {object} props
+   * @param {string} key
+   */
+
+  function jsxDEV(type, config, maybeKey, source, self) {
+    var propName; // Reserved names are extracted
+
+    var props = {};
+    var key = null;
+    var ref = null; // Currently, key can be spread in as a prop. This causes a potential
+    // issue if key is also explicitly declared (ie. <div {...props} key="Hi" />
+    // or <div key="Hi" {...props} /> ). We want to deprecate key spread,
+    // but as an intermediary step, we will use jsxDEV for everything except
+    // <div {...props} key="Hi" />, because we aren't currently able to tell if
+    // key is explicitly declared to be undefined or not.
+
+    if (maybeKey !== undefined) {
+      key = '' + maybeKey;
+    }
+
+    if (hasValidKey(config)) {
+      key = '' + config.key;
+    }
+
+    if (hasValidRef(config)) {
+      ref = config.ref;
+      warnIfStringRefCannotBeAutoConverted(config);
+    } // Remaining properties are added to a new props object
+
+
+    for (propName in config) {
+      if (hasOwnProperty$1.call(config, propName) && !RESERVED_PROPS.hasOwnProperty(propName)) {
+        props[propName] = config[propName];
+      }
+    } // Resolve default props
+
+
+    if (type && type.defaultProps) {
+      var defaultProps = type.defaultProps;
+
+      for (propName in defaultProps) {
+        if (props[propName] === undefined) {
+          props[propName] = defaultProps[propName];
+        }
+      }
+    }
+
+    if (key || ref) {
+      var displayName = typeof type === 'function' ? type.displayName || type.name || 'Unknown' : type;
+
+      if (key) {
+        defineKeyPropWarningGetter(props, displayName);
+      }
+
+      if (ref) {
+        defineRefPropWarningGetter(props, displayName);
+      }
+    }
+
+    return ReactElement(type, key, ref, self, source, ReactCurrentOwner.current, props);
+  }
   /**
    * Create and return a new ReactElement of the given type.
    * See https://reactjs.org/docs/react-api.html#createelement
@@ -1375,6 +1447,11 @@
 
             return context.Consumer;
           }
+        },
+        displayName: {
+          get: function () {
+            return context.displayName;
+          }
         }
       }); // $FlowFixMe: Flow complains about missing properties because it doesn't understand defineProperty
 
@@ -1392,16 +1469,16 @@
   function lazy(ctor) {
     var lazyType = {
       $$typeof: REACT_LAZY_TYPE,
-      _ctor: ctor,
       // React uses these fields to store the result.
       _status: -1,
-      _result: null
+      _result: ctor
     };
 
     {
       // In production, this would just set it on the object.
       var defaultProps;
-      var propTypes;
+      var propTypes; // $FlowFixMe
+
       Object.defineProperties(lazyType, {
         defaultProps: {
           configurable: true,
@@ -1412,6 +1489,7 @@
             error('React.lazy(...): It is not supported to assign `defaultProps` to ' + 'a lazy component import. Either specify them where the component ' + 'is defined, or create a wrapping component around it.');
 
             defaultProps = newDefaultProps; // Match production behavior more closely:
+            // $FlowFixMe
 
             Object.defineProperty(lazyType, 'defaultProps', {
               enumerable: true
@@ -1427,6 +1505,7 @@
             error('React.lazy(...): It is not supported to assign `propTypes` to ' + 'a lazy component import. Either specify them where the component ' + 'is defined, or create a wrapping component around it.');
 
             propTypes = newPropTypes; // Match production behavior more closely:
+            // $FlowFixMe
 
             Object.defineProperty(lazyType, 'propTypes', {
               enumerable: true
@@ -1873,6 +1952,98 @@
 
       setCurrentlyValidatingElement(null);
     }
+  }
+
+  function jsxWithValidation(type, props, key, isStaticChildren, source, self) {
+    var validType = isValidElementType(type); // We warn in this case but don't throw. We expect the element creation to
+    // succeed and there will likely be errors in render.
+
+    if (!validType) {
+      var info = '';
+
+      if (type === undefined || typeof type === 'object' && type !== null && Object.keys(type).length === 0) {
+        info += ' You likely forgot to export your component from the file ' + "it's defined in, or you might have mixed up default and named imports.";
+      }
+
+      var sourceInfo = getSourceInfoErrorAddendum(source);
+
+      if (sourceInfo) {
+        info += sourceInfo;
+      } else {
+        info += getDeclarationErrorAddendum();
+      }
+
+      var typeString;
+
+      if (type === null) {
+        typeString = 'null';
+      } else if (Array.isArray(type)) {
+        typeString = 'array';
+      } else if (type !== undefined && type.$$typeof === REACT_ELEMENT_TYPE) {
+        typeString = "<" + (getComponentName(type.type) || 'Unknown') + " />";
+        info = ' Did you accidentally export a JSX literal instead of a component?';
+      } else {
+        typeString = typeof type;
+      }
+
+      {
+        error('React.jsx: type is invalid -- expected a string (for ' + 'built-in components) or a class/function (for composite ' + 'components) but got: %s.%s', typeString, info);
+      }
+    }
+
+    var element = jsxDEV(type, props, key, source, self); // The result can be nullish if a mock or a custom function is used.
+    // TODO: Drop this when these are no longer allowed as the type argument.
+
+    if (element == null) {
+      return element;
+    } // Skip key warning if the type isn't valid since our key validation logic
+    // doesn't expect a non-string/function type and can throw confusing errors.
+    // We don't want exception behavior to differ between dev and prod.
+    // (Rendering will throw with a helpful message and as soon as the type is
+    // fixed, the key warnings will appear.)
+
+
+    if (validType) {
+      var children = props.children;
+
+      if (children !== undefined) {
+        if (isStaticChildren) {
+          if (Array.isArray(children)) {
+            for (var i = 0; i < children.length; i++) {
+              validateChildKeys(children[i], type);
+            }
+
+            if (Object.freeze) {
+              Object.freeze(children);
+            }
+          } else {
+            {
+              error('React.jsx: Static children should always be an array. ' + 'You are likely explicitly calling React.jsxs or React.jsxDEV. ' + 'Use the Babel transform instead.');
+            }
+          }
+        } else {
+          validateChildKeys(children, type);
+        }
+      }
+    }
+
+    if (type === REACT_FRAGMENT_TYPE) {
+      validateFragmentProps(element);
+    } else {
+      validatePropTypes(element);
+    }
+
+    return element;
+  } // These two functions exist to still get child warnings in dev
+  // even with the prod transform. This means that jsxDEV is purely
+  // opt-in behavior for better messages but that we won't stop
+  // giving you warnings if you use production apis.
+
+  function jsxWithValidationStatic(type, props, key) {
+    return jsxWithValidation(type, props, key, true);
+  }
+  function jsxWithValidationDynamic(type, props, key) {
+    return jsxWithValidation(type, props, key, false);
   }
   function createElementWithValidation(type, props, children) {
     var validType = isValidElementType(type); // We warn in this case but don't throw. We expect the element creation to
@@ -3209,6 +3380,11 @@
   var createElement$1 =  createElementWithValidation ;
   var cloneElement$1 =  cloneElementWithValidation ;
   var createFactory =  createFactoryWithValidation ;
+  var jsxDEV$1 =  jsxWithValidation ;
+  var jsx =  jsxWithValidationDynamic ; // we may want to special case jsxs internally to take advantage of static children.
+  // for now we can ship identical prod functions
+
+  var jsxs =  jsxWithValidationStatic ;
   var Children = {
     map: mapChildren,
     forEach: forEachChildren,
@@ -3234,6 +3410,9 @@
   exports.createRef = createRef;
   exports.forwardRef = forwardRef;
   exports.isValidElement = isValidElement;
+  exports.jsx = jsx;
+  exports.jsxDEV = jsxDEV$1;
+  exports.jsxs = jsxs;
   exports.lazy = lazy;
   exports.memo = memo;
   exports.unstable_withSuspenseConfig = withSuspenseConfig;

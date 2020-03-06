@@ -2193,19 +2193,29 @@ function getIteratorFn(maybeIterable) {
   return null;
 }
 
+// TODO: Move this to "react" once we can import from externals.
 var Uninitialized = -1;
 var Pending = 0;
 var Resolved = 1;
 var Rejected = 2;
+
 function refineResolvedLazyComponent(lazyComponent) {
   return lazyComponent._status === Resolved ? lazyComponent._result : null;
 }
 function initializeLazyComponentType(lazyComponent) {
   if (lazyComponent._status === Uninitialized) {
-    lazyComponent._status = Pending;
-    var ctor = lazyComponent._ctor;
-    var thenable = ctor();
-    lazyComponent._result = thenable;
+    var ctor = lazyComponent._result;
+
+    if (!ctor) {
+      // TODO: Remove this later. THis only exists in case you use an older "react" package.
+      ctor = lazyComponent._ctor;
+    }
+
+    var thenable = ctor(); // Transition to the next state.
+
+    var pending = lazyComponent;
+    pending._status = Pending;
+    pending._result = thenable;
     thenable.then(
       function(moduleObject) {
         if (lazyComponent._status === Pending) {
@@ -2220,16 +2230,19 @@ function initializeLazyComponentType(lazyComponent) {
                 moduleObject
               );
             }
-          }
+          } // Transition to the next state.
 
-          lazyComponent._status = Resolved;
-          lazyComponent._result = defaultExport;
+          var resolved = lazyComponent;
+          resolved._status = Resolved;
+          resolved._result = defaultExport;
         }
       },
       function(error) {
         if (lazyComponent._status === Pending) {
-          lazyComponent._status = Rejected;
-          lazyComponent._result = error;
+          // Transition to the next state.
+          var rejected = lazyComponent;
+          rejected._status = Rejected;
+          rejected._result = error;
         }
       }
     );
@@ -2242,6 +2255,10 @@ function getWrappedName(outerType, innerType, wrapperName) {
     outerType.displayName ||
     (functionName !== "" ? wrapperName + "(" + functionName + ")" : wrapperName)
   );
+}
+
+function getContextName(type) {
+  return type.displayName || "Context";
 }
 
 function getComponentName(type) {
@@ -2290,10 +2307,12 @@ function getComponentName(type) {
   if (typeof type === "object") {
     switch (type.$$typeof) {
       case REACT_CONTEXT_TYPE:
-        return "Context.Consumer";
+        var context = type;
+        return getContextName(context) + ".Consumer";
 
       case REACT_PROVIDER_TYPE:
-        return "Context.Provider";
+        var provider = type;
+        return getContextName(provider._context) + ".Provider";
 
       case REACT_FORWARD_REF_TYPE:
         return getWrappedName(type, type.render, "ForwardRef");
@@ -3857,6 +3876,20 @@ function getListenerMapForElement(element) {
 
   return listenerMap;
 }
+function isListeningToAllDependencies(registrationName, mountAt) {
+  var listenerMap = getListenerMapForElement(mountAt);
+  var dependencies = registrationNameDependencies[registrationName];
+
+  for (var i = 0; i < dependencies.length; i++) {
+    var dependency = dependencies[i];
+
+    if (!listenerMap.has(dependency)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 /**
  * `ReactInstanceMap` maintains a mapping from a public facing stateful
@@ -4726,13 +4759,13 @@ function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
   if (!listenerMap.has(topLevelType)) {
     switch (topLevelType) {
       case TOP_SCROLL:
-        trapCapturedEvent(TOP_SCROLL, mountAt);
+        legacyTrapCapturedEvent(TOP_SCROLL, mountAt);
         break;
 
       case TOP_FOCUS:
       case TOP_BLUR:
-        trapCapturedEvent(TOP_FOCUS, mountAt);
-        trapCapturedEvent(TOP_BLUR, mountAt); // We set the flag for a single dependency later in this function,
+        legacyTrapCapturedEvent(TOP_FOCUS, mountAt);
+        legacyTrapCapturedEvent(TOP_BLUR, mountAt); // We set the flag for a single dependency later in this function,
         // but this ensures we mark both as attached rather than just one.
 
         listenerMap.set(TOP_BLUR, null);
@@ -4742,7 +4775,7 @@ function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
       case TOP_CANCEL:
       case TOP_CLOSE:
         if (isEventSupported(getRawEventName(topLevelType))) {
-          trapCapturedEvent(topLevelType, mountAt);
+          legacyTrapCapturedEvent(topLevelType, mountAt);
         }
 
         break;
@@ -4760,7 +4793,7 @@ function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
         var isMediaEvent = mediaEventTypes.indexOf(topLevelType) !== -1;
 
         if (!isMediaEvent) {
-          trapBubbledEvent(topLevelType, mountAt);
+          legacyTrapBubbledEvent(topLevelType, mountAt);
         }
 
         break;
@@ -4769,19 +4802,11 @@ function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
     listenerMap.set(topLevelType, null);
   }
 }
-function isListeningToAllDependencies(registrationName, mountAt) {
-  var listenerMap = getListenerMapForElement(mountAt);
-  var dependencies = registrationNameDependencies[registrationName];
-
-  for (var i = 0; i < dependencies.length; i++) {
-    var dependency = dependencies[i];
-
-    if (!listenerMap.has(dependency)) {
-      return false;
-    }
-  }
-
-  return true;
+function legacyTrapBubbledEvent(topLevelType, element) {
+  trapEventForPluginEventSystem(element, topLevelType, false);
+}
+function legacyTrapCapturedEvent(topLevelType, element) {
+  trapEventForPluginEventSystem(element, topLevelType, true);
 }
 
 var attemptSynchronousHydration;
@@ -4865,7 +4890,9 @@ function isReplayableDiscreteEvent(eventType) {
 }
 
 function trapReplayableEventForDocument(topLevelType, document, listenerMap) {
-  legacyListenToTopLevelEvent(topLevelType, document, listenerMap);
+  {
+    legacyListenToTopLevelEvent(topLevelType, document, listenerMap);
+  }
 
   {
     // Trap events for the responder system.
@@ -4888,7 +4915,7 @@ function trapReplayableEventForDocument(topLevelType, document, listenerMap) {
 }
 
 function eagerlyTrapReplayableEvents(container, document) {
-  var listenerMapForDoc = getListenerMapForElement(document); // Discrete
+  var listenerMapForDoc = getListenerMapForElement(document);
 
   discreteReplayableEvents.forEach(function(topLevelType) {
     trapReplayableEventForDocument(topLevelType, document, listenerMapForDoc);
@@ -5349,10 +5376,10 @@ function retryIfBlockedOn(unblocked) {
 var EventListenerWWW = require("EventListener");
 
 function addEventBubbleListener(element, eventType, listener) {
-  EventListenerWWW.listen(element, eventType, listener);
+  return EventListenerWWW.listen(element, eventType, listener);
 }
 function addEventCaptureListener(element, eventType, listener) {
-  EventListenerWWW.capture(element, eventType, listener);
+  return EventListenerWWW.capture(element, eventType, listener);
 }
 function addEventCaptureListenerWithPassiveFlag(
   element,
@@ -5360,7 +5387,7 @@ function addEventCaptureListenerWithPassiveFlag(
   listener,
   passive
 ) {
-  EventListenerWWW.captureWithPassiveFlag(
+  return EventListenerWWW.captureWithPassiveFlag(
     element,
     eventType,
     listener,
@@ -5545,12 +5572,6 @@ function setEnabled(enabled) {
 function isEnabled() {
   return _enabled;
 }
-function trapBubbledEvent(topLevelType, element) {
-  trapEventForPluginEventSystem(element, topLevelType, false);
-}
-function trapCapturedEvent(topLevelType, element) {
-  trapEventForPluginEventSystem(element, topLevelType, true);
-}
 function addResponderEventSystemEvent(document, topLevelType, passive) {
   var eventFlags = RESPONDER_EVENT_SYSTEM; // If passive option is not supported, then the event will be
   // active and not passive, but we flag it as using not being
@@ -5598,46 +5619,43 @@ function removeActiveResponderEventSystemEvent(
     document.removeEventListener(topLevelType, listener, true);
   }
 }
-
-function trapEventForPluginEventSystem(container, topLevelType, capture) {
+function trapEventForPluginEventSystem(
+  container,
+  topLevelType,
+  capture,
+  legacyFBSupport
+) {
   var listener;
+  var listenerWrapper;
 
   switch (getEventPriorityForPluginSystem(topLevelType)) {
     case DiscreteEvent:
-      listener = dispatchDiscreteEvent.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
+      listenerWrapper = dispatchDiscreteEvent;
       break;
 
     case UserBlockingEvent:
-      listener = dispatchUserBlockingUpdate.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
+      listenerWrapper = dispatchUserBlockingUpdate;
       break;
 
     case ContinuousEvent:
     default:
-      listener = dispatchEvent.bind(
-        null,
-        topLevelType,
-        PLUGIN_EVENT_SYSTEM,
-        container
-      );
+      listenerWrapper = dispatchEvent;
       break;
   }
 
+  listener = listenerWrapper.bind(
+    null,
+    topLevelType,
+    PLUGIN_EVENT_SYSTEM,
+    container
+  );
   var rawEventName = getRawEventName(topLevelType);
+  var fbListener; // When legacyFBSupport is enabled, it's for when we
 
   if (capture) {
-    addEventCaptureListener(container, rawEventName, listener);
+    fbListener = addEventCaptureListener(container, rawEventName, listener);
   } else {
-    addEventBubbleListener(container, rawEventName, listener);
+    fbListener = addEventBubbleListener(container, rawEventName, listener);
   }
 }
 
@@ -5737,12 +5755,14 @@ function dispatchEvent(topLevelType, eventSystemFlags, container, nativeEvent) {
 
   {
     if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
-      dispatchEventForLegacyPluginEventSystem(
-        topLevelType,
-        eventSystemFlags,
-        nativeEvent,
-        null
-      );
+      {
+        dispatchEventForLegacyPluginEventSystem(
+          topLevelType,
+          eventSystemFlags,
+          nativeEvent,
+          null
+        );
+      }
     }
 
     if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
@@ -5813,12 +5833,14 @@ function attemptToDispatchEvent(
 
   {
     if (eventSystemFlags & PLUGIN_EVENT_SYSTEM) {
-      dispatchEventForLegacyPluginEventSystem(
-        topLevelType,
-        eventSystemFlags,
-        nativeEvent,
-        targetInst
-      );
+      {
+        dispatchEventForLegacyPluginEventSystem(
+          topLevelType,
+          eventSystemFlags,
+          nativeEvent,
+          targetInst
+        );
+      }
     }
 
     if (eventSystemFlags & RESPONDER_EVENT_SYSTEM) {
@@ -7696,14 +7718,17 @@ var normalizeHTML;
   };
 }
 
-function ensureListeningTo(rootContainerElement, registrationName) {
-  var isDocumentOrFragment =
-    rootContainerElement.nodeType === DOCUMENT_NODE ||
-    rootContainerElement.nodeType === DOCUMENT_FRAGMENT_NODE;
-  var doc = isDocumentOrFragment
-    ? rootContainerElement
-    : rootContainerElement.ownerDocument;
-  legacyListenToEvent(registrationName, doc);
+function ensureListeningTo(rootContainerInstance, registrationName) {
+  {
+    // Legacy plugin event system path
+    var isDocumentOrFragment =
+      rootContainerInstance.nodeType === DOCUMENT_NODE ||
+      rootContainerInstance.nodeType === DOCUMENT_FRAGMENT_NODE;
+    var doc = isDocumentOrFragment
+      ? rootContainerInstance
+      : rootContainerInstance.ownerDocument;
+    legacyListenToEvent(registrationName, doc);
+  }
 }
 
 function getOwnerDocumentFromRootContainer(rootContainerElement) {
@@ -7940,48 +7965,68 @@ function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
     case "iframe":
     case "object":
     case "embed":
-      trapBubbledEvent(TOP_LOAD, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_LOAD, domElement);
+      }
+
       props = rawProps;
       break;
 
     case "video":
     case "audio":
-      // Create listener for each media event
-      for (var i = 0; i < mediaEventTypes.length; i++) {
-        trapBubbledEvent(mediaEventTypes[i], domElement);
+      {
+        // Create listener for each media event
+        for (var i = 0; i < mediaEventTypes.length; i++) {
+          legacyTrapBubbledEvent(mediaEventTypes[i], domElement);
+        }
       }
 
       props = rawProps;
       break;
 
     case "source":
-      trapBubbledEvent(TOP_ERROR, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_ERROR, domElement);
+      }
+
       props = rawProps;
       break;
 
     case "img":
     case "image":
     case "link":
-      trapBubbledEvent(TOP_ERROR, domElement);
-      trapBubbledEvent(TOP_LOAD, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_ERROR, domElement);
+        legacyTrapBubbledEvent(TOP_LOAD, domElement);
+      }
+
       props = rawProps;
       break;
 
     case "form":
-      trapBubbledEvent(TOP_RESET, domElement);
-      trapBubbledEvent(TOP_SUBMIT, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_RESET, domElement);
+        legacyTrapBubbledEvent(TOP_SUBMIT, domElement);
+      }
+
       props = rawProps;
       break;
 
     case "details":
-      trapBubbledEvent(TOP_TOGGLE, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_TOGGLE, domElement);
+      }
+
       props = rawProps;
       break;
 
     case "input":
       initWrapperState(domElement, rawProps);
       props = getHostProps(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -7995,7 +8040,10 @@ function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
     case "select":
       initWrapperState$1(domElement, rawProps);
       props = getHostProps$2(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -8004,7 +8052,10 @@ function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
     case "textarea":
       initWrapperState$2(domElement, rawProps);
       props = getHostProps$3(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -8354,41 +8405,61 @@ function diffHydratedProperties(
     case "iframe":
     case "object":
     case "embed":
-      trapBubbledEvent(TOP_LOAD, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_LOAD, domElement);
+      }
+
       break;
 
     case "video":
     case "audio":
-      // Create listener for each media event
-      for (var i = 0; i < mediaEventTypes.length; i++) {
-        trapBubbledEvent(mediaEventTypes[i], domElement);
+      {
+        // Create listener for each media event
+        for (var i = 0; i < mediaEventTypes.length; i++) {
+          legacyTrapBubbledEvent(mediaEventTypes[i], domElement);
+        }
       }
 
       break;
 
     case "source":
-      trapBubbledEvent(TOP_ERROR, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_ERROR, domElement);
+      }
+
       break;
 
     case "img":
     case "image":
     case "link":
-      trapBubbledEvent(TOP_ERROR, domElement);
-      trapBubbledEvent(TOP_LOAD, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_ERROR, domElement);
+        legacyTrapBubbledEvent(TOP_LOAD, domElement);
+      }
+
       break;
 
     case "form":
-      trapBubbledEvent(TOP_RESET, domElement);
-      trapBubbledEvent(TOP_SUBMIT, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_RESET, domElement);
+        legacyTrapBubbledEvent(TOP_SUBMIT, domElement);
+      }
+
       break;
 
     case "details":
-      trapBubbledEvent(TOP_TOGGLE, domElement);
+      {
+        legacyTrapBubbledEvent(TOP_TOGGLE, domElement);
+      }
+
       break;
 
     case "input":
       initWrapperState(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -8400,7 +8471,10 @@ function diffHydratedProperties(
 
     case "select":
       initWrapperState$1(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -8408,7 +8482,10 @@ function diffHydratedProperties(
 
     case "textarea":
       initWrapperState$2(domElement, rawProps);
-      trapBubbledEvent(TOP_INVALID, domElement); // For controlled components we always need to ensure we're listening
+
+      {
+        legacyTrapBubbledEvent(TOP_INVALID, domElement);
+      } // For controlled components we always need to ensure we're listening
       // to onChange. Even if there is no listener.
 
       ensureListeningTo(rootContainerElement, "onChange");
@@ -10131,7 +10208,7 @@ function instanceContainsElem(instance, element) {
   var fiber = getClosestInstanceFromNode(element);
 
   while (fiber !== null) {
-    if (fiber.tag === HostComponent && fiber.stateNode === element) {
+    if (fiber.tag === HostComponent && fiber.stateNode === instance) {
       return true;
     }
 
@@ -11605,7 +11682,7 @@ function extractCompositionEvent(
     }
   }
 
-  accumulateTwoPhaseDispatches(event);
+  accumulateTwoPhaseDispatchesSingle(event);
   return event;
 }
 /**
@@ -11770,7 +11847,7 @@ function extractBeforeInputEvent(
     nativeEventTarget
   );
   event.data = chars;
-  accumulateTwoPhaseDispatches(event);
+  accumulateTwoPhaseDispatchesSingle(event);
   return event;
 }
 /**
@@ -11890,7 +11967,7 @@ function createAndAccumulateChangeEvent(inst, nativeEvent, target) {
   event.type = "change"; // Flag this event loop as needing state restore.
 
   enqueueStateRestore(target);
-  accumulateTwoPhaseDispatches(event);
+  accumulateTwoPhaseDispatchesSingle(event);
   return event;
 }
 /**
@@ -12294,16 +12371,18 @@ var EnterLeaveEventPlugin = {
     var isOutEvent =
       topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_POINTER_OUT;
 
-    if (
-      isOverEvent &&
-      (eventSystemFlags & IS_REPLAYED) === 0 &&
-      (nativeEvent.relatedTarget || nativeEvent.fromElement)
-    ) {
-      // If this is an over event with a target, then we've already dispatched
-      // the event in the out event of the other target. If this is replayed,
-      // then it's because we couldn't dispatch against this target previously
-      // so we have to do it now instead.
-      return null;
+    if (isOverEvent && (eventSystemFlags & IS_REPLAYED) === 0) {
+      var related = nativeEvent.relatedTarget || nativeEvent.fromElement;
+
+      if (related) {
+        {
+          // If this is an over event with a target, then we've already dispatched
+          // the event in the out event of the other target. If this is replayed,
+          // then it's because we couldn't dispatch against this target previously
+          // so we have to do it now instead.
+          return null;
+        }
+      }
     }
 
     if (!isOutEvent && !isOverEvent) {
@@ -12332,8 +12411,10 @@ var EnterLeaveEventPlugin = {
 
     if (isOutEvent) {
       from = targetInst;
-      var related = nativeEvent.relatedTarget || nativeEvent.toElement;
-      to = related ? getClosestInstanceFromNode(related) : null;
+
+      var _related = nativeEvent.relatedTarget || nativeEvent.toElement;
+
+      to = _related ? getClosestInstanceFromNode(_related) : null;
 
       if (to !== null) {
         var nearestMounted = getNearestMountedFiber(to);
@@ -12393,12 +12474,15 @@ var EnterLeaveEventPlugin = {
     enter.type = eventTypePrefix + "enter";
     enter.target = toNode;
     enter.relatedTarget = fromNode;
-    accumulateEnterLeaveDispatches(leave, enter, from, to); // If we are not processing the first ancestor, then we
-    // should not process the same nativeEvent again, as we
-    // will have already processed it in the first ancestor.
+    accumulateEnterLeaveDispatches(leave, enter, from, to);
 
-    if ((eventSystemFlags & IS_FIRST_ANCESTOR) === 0) {
-      return [leave];
+    {
+      // If we are not processing the first ancestor, then we
+      // should not process the same nativeEvent again, as we
+      // will have already processed it in the first ancestor.
+      if ((eventSystemFlags & IS_FIRST_ANCESTOR) === 0) {
+        return [leave];
+      }
     }
 
     return [leave, enter];
@@ -12558,7 +12642,7 @@ function constructSelectEvent(nativeEvent, nativeEventTarget) {
     );
     syntheticEvent.type = "select";
     syntheticEvent.target = activeElement$1;
-    accumulateTwoPhaseDispatches(syntheticEvent);
+    accumulateTwoPhaseDispatchesSingle(syntheticEvent);
     return syntheticEvent;
   }
 
@@ -13120,7 +13204,7 @@ var SimpleEventPlugin = {
       nativeEvent,
       nativeEventTarget
     );
-    accumulateTwoPhaseDispatches(event);
+    accumulateTwoPhaseDispatchesSingle(event);
     return event;
   }
 };
@@ -23489,7 +23573,12 @@ function beginWork(current, workInProgress, renderExpirationTime) {
 }
 
 function isFiberSuspenseAndTimedOut(fiber) {
-  return fiber.tag === SuspenseComponent && fiber.memoizedState !== null;
+  var memoizedState = fiber.memoizedState;
+  return (
+    fiber.tag === SuspenseComponent &&
+    memoizedState !== null &&
+    memoizedState.dehydrated === null
+  );
 }
 
 function getSuspenseFallbackChild(fiber) {
@@ -26921,7 +27010,7 @@ function ensureRootIsScheduled(root) {
 function performConcurrentWorkOnRoot(root, didTimeout) {
   // Since we know we're in a React event, we can clear the current
   // event time. The next update will compute a new event time.
-  currentEventTime = NoWork;
+  currentEventTime = NoWork; // Check if the render expired.
 
   if (didTimeout) {
     // The render task took too long to complete. Mark the current time as
@@ -26936,78 +27025,52 @@ function performConcurrentWorkOnRoot(root, didTimeout) {
 
   var expirationTime = getNextRootExpirationTimeToWorkOn(root);
 
-  if (expirationTime !== NoWork) {
-    var originalCallbackNode = root.callbackNode;
+  if (expirationTime === NoWork) {
+    return null;
+  }
 
-    if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
-      {
-        throw Error("Should not already be working.");
-      }
+  var originalCallbackNode = root.callbackNode;
+
+  if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
+    {
+      throw Error("Should not already be working.");
+    }
+  }
+
+  flushPassiveEffects();
+  var exitStatus = renderRootConcurrent(root, expirationTime);
+
+  if (exitStatus !== RootIncomplete) {
+    if (exitStatus === RootErrored) {
+      // If something threw an error, try rendering one more time. We'll
+      // render synchronously to block concurrent data mutations, and we'll
+      // render at Idle (or lower) so that all pending updates are included.
+      // If it still fails after the second attempt, we'll give up and commit
+      // the resulting tree.
+      expirationTime = expirationTime > Idle ? Idle : expirationTime;
+      exitStatus = renderRootSync(root, expirationTime);
     }
 
-    flushPassiveEffects(); // If the root or expiration time have changed, throw out the existing stack
-    // and prepare a fresh one. Otherwise we'll continue where we left off.
-
-    if (
-      root !== workInProgressRoot ||
-      expirationTime !== renderExpirationTime$1
-    ) {
+    if (exitStatus === RootFatalErrored) {
+      var fatalError = workInProgressRootFatalError;
       prepareFreshStack(root, expirationTime);
-      startWorkOnPendingInteractions(root, expirationTime);
-    } // If we have a work-in-progress fiber, it means there's still work to do
-    // in this root.
-
-    if (workInProgress !== null) {
-      var prevExecutionContext = executionContext;
-      executionContext |= RenderContext;
-      var prevDispatcher = pushDispatcher();
-      var prevInteractions = pushInteractions(root);
-
-      do {
-        try {
-          workLoopConcurrent();
-          break;
-        } catch (thrownValue) {
-          handleError(root, thrownValue);
-        }
-      } while (true);
-
-      resetContextDependencies();
-      executionContext = prevExecutionContext;
-      popDispatcher(prevDispatcher);
-
-      {
-        popInteractions(prevInteractions);
-      }
-
-      if (workInProgressRootExitStatus === RootFatalErrored) {
-        var fatalError = workInProgressRootFatalError;
-        prepareFreshStack(root, expirationTime);
-        markRootSuspendedAtTime(root, expirationTime);
-        ensureRootIsScheduled(root);
-        throw fatalError;
-      }
-
-      if (workInProgress !== null);
-      else {
-        var finishedWork = (root.finishedWork = root.current.alternate);
-        root.finishedExpirationTime = expirationTime;
-        finishConcurrentRender(
-          root,
-          finishedWork,
-          workInProgressRootExitStatus,
-          expirationTime
-        );
-      }
-
+      markRootSuspendedAtTime(root, expirationTime);
       ensureRootIsScheduled(root);
+      throw fatalError;
+    } // We now have a consistent tree. The next step is either to commit it,
+    // or, if something suspended, wait to commit it after a timeout.
 
-      if (root.callbackNode === originalCallbackNode) {
-        // The task node scheduled for this root is the same one that's
-        // currently executed. Need to return a continuation.
-        return performConcurrentWorkOnRoot.bind(null, root);
-      }
-    }
+    var finishedWork = (root.finishedWork = root.current.alternate);
+    root.finishedExpirationTime = expirationTime;
+    finishConcurrentRender(root, finishedWork, exitStatus, expirationTime);
+  }
+
+  ensureRootIsScheduled(root);
+
+  if (root.callbackNode === originalCallbackNode) {
+    // The task node scheduled for this root is the same one that's
+    // currently executed. Need to return a continuation.
+    return performConcurrentWorkOnRoot.bind(null, root);
   }
 
   return null;
@@ -27019,9 +27082,6 @@ function finishConcurrentRender(
   exitStatus,
   expirationTime
 ) {
-  // Set this to null to indicate there's no in-progress render.
-  workInProgressRoot = null;
-
   switch (exitStatus) {
     case RootIncomplete:
     case RootFatalErrored: {
@@ -27036,19 +27096,9 @@ function finishConcurrentRender(
     // if I do. eslint-disable-next-line no-fallthrough
 
     case RootErrored: {
-      // If this was an async render, the error may have happened due to
-      // a mutation in a concurrent event. Try rendering one more time,
-      // synchronously, to see if the error goes away. If there are
-      // lower priority updates, let's include those, too, in case they
-      // fix the inconsistency. Render at Idle to include all updates.
-      // If it was Idle or Never or some not-yet-invented time, render
-      // at that time.
-      markRootExpiredAtTime(
-        root,
-        expirationTime > Idle ? Idle : expirationTime
-      ); // We assume that this second render pass will be synchronous
-      // and therefore not hit this path again.
-
+      // We should have already attempted to retry this tree. If we reached
+      // this point, it errored again. Commit it.
+      commitRoot(root);
       break;
     }
 
@@ -27266,85 +27316,64 @@ function finishConcurrentRender(
 // through Scheduler
 
 function performSyncWorkOnRoot(root) {
-  // Check if there's expired work on this root. Otherwise, render at Sync.
-  var lastExpiredTime = root.lastExpiredTime;
-  var expirationTime = lastExpiredTime !== NoWork ? lastExpiredTime : Sync;
-
   if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
     {
       throw Error("Should not already be working.");
     }
   }
 
-  flushPassiveEffects(); // If the root or expiration time have changed, throw out the existing stack
-  // and prepare a fresh one. Otherwise we'll continue where we left off.
+  flushPassiveEffects();
+  var lastExpiredTime = root.lastExpiredTime;
+  var expirationTime;
 
-  if (
-    root !== workInProgressRoot ||
-    expirationTime !== renderExpirationTime$1
-  ) {
-    prepareFreshStack(root, expirationTime);
-    startWorkOnPendingInteractions(root, expirationTime);
-  } // If we have a work-in-progress fiber, it means there's still work to do
-  // in this root.
-
-  if (workInProgress !== null) {
-    var prevExecutionContext = executionContext;
-    executionContext |= RenderContext;
-    var prevDispatcher = pushDispatcher();
-    var prevInteractions = pushInteractions(root);
-
-    do {
-      try {
-        workLoopSync();
-        break;
-      } catch (thrownValue) {
-        handleError(root, thrownValue);
-      }
-    } while (true);
-
-    resetContextDependencies();
-    executionContext = prevExecutionContext;
-    popDispatcher(prevDispatcher);
-
-    {
-      popInteractions(prevInteractions);
-    }
-
-    if (workInProgressRootExitStatus === RootFatalErrored) {
-      var fatalError = workInProgressRootFatalError;
-      prepareFreshStack(root, expirationTime);
-      markRootSuspendedAtTime(root, expirationTime);
-      ensureRootIsScheduled(root);
-      throw fatalError;
-    }
-
-    if (workInProgress !== null) {
-      // This is a sync render, so we should have finished the whole tree.
-      {
-        {
-          throw Error(
-            "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue."
-          );
-        }
-      }
+  if (lastExpiredTime !== NoWork) {
+    // There's expired work on this root. Check if we have a partial tree
+    // that we can reuse.
+    if (
+      root === workInProgressRoot &&
+      renderExpirationTime$1 >= lastExpiredTime
+    ) {
+      // There's a partial tree with equal or greater than priority than the
+      // expired level. Finish rendering it before rendering the rest of the
+      // expired work.
+      expirationTime = renderExpirationTime$1;
     } else {
-      root.finishedWork = root.current.alternate;
-      root.finishedExpirationTime = expirationTime;
-      finishSyncRender(root);
-    } // Before exiting, make sure there's a callback scheduled for the next
-    // pending level.
-
-    ensureRootIsScheduled(root);
+      // Start a fresh tree.
+      expirationTime = lastExpiredTime;
+    }
+  } else {
+    // There's no expired work. This must be a new, synchronous render.
+    expirationTime = Sync;
   }
 
-  return null;
-}
+  var exitStatus = renderRootSync(root, expirationTime);
 
-function finishSyncRender(root) {
-  // Set this to null to indicate there's no in-progress render.
-  workInProgressRoot = null;
-  commitRoot(root);
+  if (root.tag !== LegacyRoot && exitStatus === RootErrored) {
+    // If something threw an error, try rendering one more time. We'll
+    // render synchronously to block concurrent data mutations, and we'll
+    // render at Idle (or lower) so that all pending updates are included.
+    // If it still fails after the second attempt, we'll give up and commit
+    // the resulting tree.
+    expirationTime = expirationTime > Idle ? Idle : expirationTime;
+    exitStatus = renderRootSync(root, expirationTime);
+  }
+
+  if (exitStatus === RootFatalErrored) {
+    var fatalError = workInProgressRootFatalError;
+    prepareFreshStack(root, expirationTime);
+    markRootSuspendedAtTime(root, expirationTime);
+    ensureRootIsScheduled(root);
+    throw fatalError;
+  } // We now have a consistent tree. Because this is a sync render, we
+  // will commit it even if something suspended.
+
+  root.finishedWork = root.current.alternate;
+  root.finishedExpirationTime = expirationTime;
+  commitRoot(root); // Before exiting, make sure there's a callback scheduled for the next
+  // pending level.
+
+  ensureRootIsScheduled(root);
+  return null;
 }
 
 function flushRoot(root, expirationTime) {
@@ -27699,6 +27728,55 @@ function inferTimeFromExpirationTimeWithSuspenseConfig(
     earliestExpirationTimeMs -
     (suspenseConfig.timeoutMs | 0 || LOW_PRIORITY_EXPIRATION)
   );
+}
+
+function renderRootSync(root, expirationTime) {
+  var prevExecutionContext = executionContext;
+  executionContext |= RenderContext;
+  var prevDispatcher = pushDispatcher(); // If the root or expiration time have changed, throw out the existing stack
+  // and prepare a fresh one. Otherwise we'll continue where we left off.
+
+  if (
+    root !== workInProgressRoot ||
+    expirationTime !== renderExpirationTime$1
+  ) {
+    prepareFreshStack(root, expirationTime);
+    startWorkOnPendingInteractions(root, expirationTime);
+  }
+
+  var prevInteractions = pushInteractions(root);
+
+  do {
+    try {
+      workLoopSync();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  } while (true);
+
+  resetContextDependencies();
+
+  {
+    popInteractions(prevInteractions);
+  }
+
+  executionContext = prevExecutionContext;
+  popDispatcher(prevDispatcher);
+
+  if (workInProgress !== null) {
+    // This is a sync render, so we should have finished the whole tree.
+    {
+      {
+        throw Error(
+          "Cannot commit an incomplete root. This error is likely caused by a bug in React. Please file an issue."
+        );
+      }
+    }
+  }
+
+  workInProgressRoot = null;
+  return workInProgressRootExitStatus;
 } // The work loop is an extremely hot path. Tell Closure not to inline it.
 
 /** @noinline */
@@ -27707,6 +27785,49 @@ function workLoopSync() {
   // Already timed out, so perform work without checking if we need to yield.
   while (workInProgress !== null) {
     workInProgress = performUnitOfWork(workInProgress);
+  }
+}
+
+function renderRootConcurrent(root, expirationTime) {
+  var prevExecutionContext = executionContext;
+  executionContext |= RenderContext;
+  var prevDispatcher = pushDispatcher(); // If the root or expiration time have changed, throw out the existing stack
+  // and prepare a fresh one. Otherwise we'll continue where we left off.
+
+  if (
+    root !== workInProgressRoot ||
+    expirationTime !== renderExpirationTime$1
+  ) {
+    prepareFreshStack(root, expirationTime);
+    startWorkOnPendingInteractions(root, expirationTime);
+  }
+
+  var prevInteractions = pushInteractions(root);
+
+  do {
+    try {
+      workLoopConcurrent();
+      break;
+    } catch (thrownValue) {
+      handleError(root, thrownValue);
+    }
+  } while (true);
+
+  resetContextDependencies();
+
+  {
+    popInteractions(prevInteractions);
+  }
+
+  popDispatcher(prevDispatcher);
+  executionContext = prevExecutionContext; // Check if the tree has completed.
+
+  if (workInProgress !== null) {
+    return RootIncomplete;
+  } else {
+    workInProgressRoot = null; // Return the final exit status.
+
+    return workInProgressRootExitStatus;
   }
 }
 /** @noinline */
