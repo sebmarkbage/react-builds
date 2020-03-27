@@ -1,0 +1,53 @@
+{
+  "bundleSizes": [
+    {
+      "filename": "react-dom.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 125530,
+      "gzip": 39246
+    },
+    {
+      "filename": "react-dom-test-utils.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 12389,
+      "gzip": 4563
+    },
+    {
+      "filename": "react-dom-unstable-native-dependencies.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 10277,
+      "gzip": 3442
+    },
+    {
+      "filename": "react-dom-server.browser.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 20518,
+      "gzip": 7530
+    },
+    {
+      "filename": "react-dom-server.node.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 20937,
+      "gzip": 7682
+    },
+    {
+      "filename": "react-dom-unstable-fizz.browser.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 1007,
+      "gzip": 593
+    },
+    {
+      "filename": "react-dom-unstable-fizz.node.production.min.js",
+      "bundleType": "NODE_PROD",
+      "packageName": "react-dom",
+      "size": 1167,
+      "gzip": 645
+    }
+  ]
+}
