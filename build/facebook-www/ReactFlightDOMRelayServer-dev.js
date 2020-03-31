@@ -1,0 +1,417 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @noflow
+ * @nolint
+ * @preventMunge
+ * @preserve-invariant-messages
+ */
+
+'use strict';
+
+if (__DEV__) {
+  (function() {
+"use strict";
+
+var ReactFlightDOMRelayServerIntegration = require("ReactFlightDOMRelayServerIntegration");
+
+function resolveModuleMetaData(config, resource) {
+  return ReactFlightDOMRelayServerIntegration.resolveModuleMetaData(
+    config,
+    resource
+  );
+}
+function processErrorChunk(request, id, message, stack) {
+  return {
+    type: "error",
+    id: id,
+    json: {
+      message: message,
+      stack: stack
+    }
+  };
+}
+
+function convertModelToJSON(request, parent, key, model) {
+  var json = resolveModelToJSON(request, parent, key, model);
+
+  if (typeof json === "object" && json !== null) {
+    if (Array.isArray(json)) {
+      var jsonArray = [];
+
+      for (var i = 0; i < json.length; i++) {
+        jsonArray[i] = convertModelToJSON(request, json, "" + i, json[i]);
+      }
+
+      return jsonArray;
+    } else {
+      var jsonObj = {};
+
+      for (var nextKey in json) {
+        jsonObj[nextKey] = convertModelToJSON(
+          request,
+          json,
+          nextKey,
+          json[nextKey]
+        );
+      }
+
+      return jsonObj;
+    }
+  }
+
+  return json;
+}
+
+function processModelChunk(request, id, model) {
+  var json = convertModelToJSON(request, {}, "", model);
+  return {
+    type: "json",
+    id: id,
+    json: json
+  };
+}
+function scheduleWork(callback) {
+  callback();
+}
+function writeChunk(destination, chunk) {
+  if (chunk.type === "json") {
+    ReactFlightDOMRelayServerIntegration.emitModel(
+      destination,
+      chunk.id,
+      chunk.json
+    );
+  } else {
+    ReactFlightDOMRelayServerIntegration.emitError(
+      destination,
+      chunk.id,
+      chunk.json.message,
+      chunk.json.stack
+    );
+  }
+
+  return true;
+}
+
+// The Symbol used to tag the ReactElement-like types. If there is no native Symbol
+// nor polyfill, then a plain number is used for performance.
+var hasSymbol = typeof Symbol === "function" && Symbol.for;
+var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 0xeac7;
+var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 0xeacb;
+var REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 0xead4;
+var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 0xead9;
+var REACT_SERVER_BLOCK_TYPE = hasSymbol
+  ? Symbol.for("react.server.block")
+  : 0xeada;
+
+function createRequest(model, destination, bundlerConfig) {
+  var pingedSegments = [];
+  var request = {
+    destination: destination,
+    bundlerConfig: bundlerConfig,
+    nextChunkId: 0,
+    pendingChunks: 0,
+    pingedSegments: pingedSegments,
+    completedJSONChunks: [],
+    completedErrorChunks: [],
+    flowing: false,
+    toJSON: function(key, value) {
+      return resolveModelToJSON(request, this, key, value);
+    }
+  };
+  request.pendingChunks++;
+  var rootSegment = createSegment(request, function() {
+    return model;
+  });
+  pingedSegments.push(rootSegment);
+  return request;
+}
+
+function attemptResolveElement(element) {
+  var type = element.type;
+  var props = element.props;
+
+  if (typeof type === "function") {
+    // This is a server-side component.
+    return type(props);
+  } else if (typeof type === "string") {
+    // This is a host element. E.g. HTML.
+    return [REACT_ELEMENT_TYPE, type, element.key, element.props];
+  } else if (type[0] === REACT_SERVER_BLOCK_TYPE) {
+    return [REACT_ELEMENT_TYPE, type, element.key, element.props];
+  } else if (type === REACT_FRAGMENT_TYPE) {
+    return element.props.children;
+  } else {
+    {
+      {
+        throw Error("Unsupported type.");
+      }
+    }
+  }
+}
+
+function pingSegment(request, segment) {
+  var pingedSegments = request.pingedSegments;
+  pingedSegments.push(segment);
+
+  if (pingedSegments.length === 1) {
+    scheduleWork(function() {
+      return performWork(request);
+    });
+  }
+}
+
+function createSegment(request, query) {
+  var id = request.nextChunkId++;
+  var segment = {
+    id: id,
+    query: query,
+    ping: function() {
+      return pingSegment(request, segment);
+    }
+  };
+  return segment;
+}
+
+function serializeIDRef(id) {
+  return "$" + id.toString(16);
+}
+
+function escapeStringValue(value) {
+  if (value[0] === "$" || value[0] === "@") {
+    // We need to escape $ or @ prefixed strings since we use those to encode
+    // references to IDs and as special symbol values.
+    return "$" + value;
+  } else {
+    return value;
+  }
+}
+
+function resolveModelToJSON(request, parent, key, value) {
+  // Special Symbols
+  switch (value) {
+    case REACT_ELEMENT_TYPE:
+      return "$";
+
+    case REACT_SERVER_BLOCK_TYPE:
+      return "@";
+
+    case REACT_LAZY_TYPE:
+    case REACT_BLOCK_TYPE: {
+      {
+        throw Error(
+          "React Blocks (and Lazy Components) are expected to be replaced by a compiler on the server. Try configuring your compiler set up and avoid using React.lazy inside of Blocks."
+        );
+      }
+    }
+  }
+
+  if (parent[0] === REACT_SERVER_BLOCK_TYPE) {
+    // We're currently encoding part of a Block. Look up which key.
+    switch (key) {
+      case "1": {
+        // Module reference
+        var moduleReference = value;
+
+        try {
+          var moduleMetaData = resolveModuleMetaData(
+            request.bundlerConfig,
+            moduleReference
+          );
+          return moduleMetaData;
+        } catch (x) {
+          request.pendingChunks++;
+          var errorId = request.nextChunkId++;
+          emitErrorChunk(request, errorId, x);
+          return serializeIDRef(errorId);
+        }
+      }
+
+      case "2": {
+        // Load function
+        var load = value;
+
+        try {
+          // Attempt to resolve the data.
+          return load();
+        } catch (x) {
+          if (
+            typeof x === "object" &&
+            x !== null &&
+            typeof x.then === "function"
+          ) {
+            // Something suspended, we'll need to create a new segment and resolve it later.
+            request.pendingChunks++;
+            var newSegment = createSegment(request, load);
+            var ping = newSegment.ping;
+            x.then(ping, ping);
+            return serializeIDRef(newSegment.id);
+          } else {
+            // This load failed, encode the error as a separate row and reference that.
+            request.pendingChunks++;
+
+            var _errorId = request.nextChunkId++;
+
+            emitErrorChunk(request, _errorId, x);
+            return serializeIDRef(_errorId);
+          }
+        }
+      }
+
+      default: {
+        {
+          {
+            throw Error(
+              "A server block should never encode any other slots. This is a bug in React."
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (typeof value === "string") {
+    return escapeStringValue(value);
+  } // Resolve server components.
+
+  while (
+    typeof value === "object" &&
+    value !== null &&
+    value.$$typeof === REACT_ELEMENT_TYPE
+  ) {
+    // TODO: Concatenate keys of parents onto children.
+    // TODO: Allow elements to suspend independently and serialize as references to future elements.
+    var element = value;
+    value = attemptResolveElement(element);
+  }
+
+  return value;
+}
+
+function emitErrorChunk(request, id, error) {
+  // TODO: We should not leak error messages to the client in prod.
+  // Give this an error code instead and log on the server.
+  // We can serialize the error in DEV as a convenience.
+  var message;
+  var stack = "";
+
+  try {
+    if (error instanceof Error) {
+      message = "" + error.message;
+      stack = "" + error.stack;
+    } else {
+      message = "Error: " + error;
+    }
+  } catch (x) {
+    message = "An error occurred but serializing the error message failed.";
+  }
+
+  var processedChunk = processErrorChunk(request, id, message, stack);
+  request.completedErrorChunks.push(processedChunk);
+}
+
+function retrySegment(request, segment) {
+  var query = segment.query;
+
+  try {
+    var _value = query();
+
+    var processedChunk = processModelChunk(request, segment.id, _value);
+    request.completedJSONChunks.push(processedChunk);
+  } catch (x) {
+    if (typeof x === "object" && x !== null && typeof x.then === "function") {
+      // Something suspended again, let's pick it back up later.
+      var ping = segment.ping;
+      x.then(ping, ping);
+      return;
+    } else {
+      // This errored, we need to serialize this error to the
+      emitErrorChunk(request, segment.id, x);
+    }
+  }
+}
+
+function performWork(request) {
+  var pingedSegments = request.pingedSegments;
+  request.pingedSegments = [];
+
+  for (var i = 0; i < pingedSegments.length; i++) {
+    var segment = pingedSegments[i];
+    retrySegment(request, segment);
+  }
+
+  if (request.flowing) {
+    flushCompletedChunks(request);
+  }
+}
+
+var reentrant = false;
+
+function flushCompletedChunks(request) {
+  if (reentrant) {
+    return;
+  }
+
+  reentrant = true;
+  var destination = request.destination;
+
+  try {
+    var jsonChunks = request.completedJSONChunks;
+    var i = 0;
+
+    for (; i < jsonChunks.length; i++) {
+      request.pendingChunks--;
+      var chunk = jsonChunks[i];
+
+      if (!writeChunk(destination, chunk)) {
+        request.flowing = false;
+        i++;
+        break;
+      }
+    }
+
+    jsonChunks.splice(0, i);
+    var errorChunks = request.completedErrorChunks;
+    i = 0;
+
+    for (; i < errorChunks.length; i++) {
+      request.pendingChunks--;
+      var _chunk = errorChunks[i];
+
+      if (!writeChunk(destination, _chunk)) {
+        request.flowing = false;
+        i++;
+        break;
+      }
+    }
+
+    errorChunks.splice(0, i);
+  } finally {
+    reentrant = false;
+  }
+
+  if (request.pendingChunks === 0) {
+    // We're done.
+    ReactFlightDOMRelayServerIntegration.close(destination);
+  }
+}
+
+function startWork(request) {
+  request.flowing = true;
+  scheduleWork(function() {
+    return performWork(request);
+  });
+}
+
+function render(model, destination, config) {
+  var request = createRequest(model, destination, config);
+  startWork(request);
+}
+
+exports.render = render;
+
+  })();
+}
