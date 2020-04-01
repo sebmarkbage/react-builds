@@ -14404,6 +14404,7 @@
       workInProgress.memoizedState = null;
       workInProgress.updateQueue = null;
       workInProgress.dependencies = null;
+      workInProgress.stateNode = null;
 
       {
         // Note: We don't reset the actualTime counts. It's useful to accumulate

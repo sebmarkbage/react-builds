@@ -8243,6 +8243,7 @@ function completeWork(current, workInProgress, renderExpirationTime) {
                         (type.memoizedState = null),
                         (type.updateQueue = null),
                         (type.dependencies = null),
+                        (type.stateNode = null),
                         (type.selfBaseDuration = 0),
                         (type.treeBaseDuration = 0))
                       : ((type.childExpirationTime =

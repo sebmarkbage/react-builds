@@ -5000,6 +5000,7 @@ function completeWork(current, workInProgress, renderExpirationTime) {
                         (rootContainerInstance.memoizedState = null),
                         (rootContainerInstance.updateQueue = null),
                         (rootContainerInstance.dependencies = null),
+                        (rootContainerInstance.stateNode = null),
                         (rootContainerInstance.selfBaseDuration = 0),
                         (rootContainerInstance.treeBaseDuration = 0))
                       : ((rootContainerInstance.childExpirationTime =

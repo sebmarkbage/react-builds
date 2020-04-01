@@ -29650,6 +29650,7 @@ function resetWorkInProgress(workInProgress, renderExpirationTime) {
     workInProgress.memoizedState = null;
     workInProgress.updateQueue = null;
     workInProgress.dependencies = null;
+    workInProgress.stateNode = null;
   } else {
     // Reset to the cloned values that createWorkInProgress would've.
     workInProgress.childExpirationTime = current.childExpirationTime;

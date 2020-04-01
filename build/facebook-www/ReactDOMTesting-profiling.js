@@ -7944,7 +7944,8 @@ function completeWork(current, workInProgress, renderExpirationTime) {
                         (type.memoizedProps = null),
                         (type.memoizedState = null),
                         (type.updateQueue = null),
-                        (type.dependencies = null))
+                        (type.dependencies = null),
+                        (type.stateNode = null))
                       : ((type.childExpirationTime =
                           current.childExpirationTime),
                         (type.expirationTime = current.expirationTime),
