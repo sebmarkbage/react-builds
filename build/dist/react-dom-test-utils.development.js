@@ -954,11 +954,9 @@
   function act(callback) {
 
     var previousActingUpdatesScopeDepth = actingUpdatesScopeDepth;
-    var previousIsSomeRendererActing;
-    var previousIsThisRendererActing;
     actingUpdatesScopeDepth++;
-    previousIsSomeRendererActing = IsSomeRendererActing.current;
-    previousIsThisRendererActing = IsThisRendererActing.current;
+    var previousIsSomeRendererActing = IsSomeRendererActing.current;
+    var previousIsThisRendererActing = IsThisRendererActing.current;
     IsSomeRendererActing.current = true;
     IsThisRendererActing.current = true;
 
@@ -1554,9 +1552,8 @@
 
 
   function getListener(inst, registrationName) {
-    var listener; // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
+    // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
     // live here; needs to be moved to a better place soon
-
     var stateNode = inst.stateNode;
 
     if (!stateNode) {
@@ -1571,7 +1568,7 @@
       return null;
     }
 
-    listener = props[registrationName];
+    var listener = props[registrationName];
 
     if (shouldPreventMouseEvent(registrationName, inst.type, props)) {
       return null;

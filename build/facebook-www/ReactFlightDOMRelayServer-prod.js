@@ -215,8 +215,8 @@ function performWork(request$jscomp$0) {
   var pingedSegments = request$jscomp$0.pingedSegments;
   request$jscomp$0.pingedSegments = [];
   for (var i = 0; i < pingedSegments.length; i++) {
+    var segment = pingedSegments[i];
     var request = request$jscomp$0,
-      segment = pingedSegments[i],
       query = segment.query;
     try {
       var value = query(),
@@ -225,7 +225,7 @@ function performWork(request$jscomp$0) {
       request.completedJSONChunks.push({ type: "json", id: id, json: json });
     } catch (x) {
       "object" === typeof x && null !== x && "function" === typeof x.then
-        ? ((request = segment.ping), x.then(request, request))
+        ? ((segment = segment.ping), x.then(segment, segment))
         : emitErrorChunk(request, segment.id, x);
     }
   }

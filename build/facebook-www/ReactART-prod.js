@@ -2225,8 +2225,8 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
     _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1];
+    setSnapshot = _dispatcher$useState[1],
+    snapshot = _dispatcher$useState[0];
   _dispatcher$useState = workInProgressHook;
   var memoizedState = hook.memoizedState,
     refs = memoizedState.refs,

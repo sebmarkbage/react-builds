@@ -1726,11 +1726,11 @@ processSimpleEventPluginPairsByPriority(
 );
 processSimpleEventPluginPairsByPriority(continuousPairsForSimpleEventPlugin, 2);
 for (
-  var i$jscomp$inline_316 = 0;
-  i$jscomp$inline_316 < otherDiscreteEvents.length;
-  i$jscomp$inline_316++
+  var i$jscomp$inline_317 = 0;
+  i$jscomp$inline_317 < otherDiscreteEvents.length;
+  i$jscomp$inline_317++
 )
-  eventPriorities.set(otherDiscreteEvents[i$jscomp$inline_316], 0);
+  eventPriorities.set(otherDiscreteEvents[i$jscomp$inline_317], 0);
 var capturePhaseEvents = new Set(
     "focus blur scroll load abort cancel close invalid reset submit abort canplay canplaythrough durationchange emptied encrypted ended error loadeddata loadedmetadata loadstart pause play playing progress ratechange seeked seeking stalled suspend timeupdate volumechange waiting".split(
       " "
@@ -3016,11 +3016,11 @@ function addEventPoolingTo(EventConstructor) {
 var SyntheticCompositionEvent = SyntheticEvent.extend({ data: null }),
   SyntheticInputEvent = SyntheticEvent.extend({ data: null });
 function getListener(inst, registrationName) {
-  var listener = inst.stateNode;
-  if (!listener) return null;
-  var props = getFiberCurrentPropsFromNode(listener);
+  var stateNode = inst.stateNode;
+  if (!stateNode) return null;
+  var props = getFiberCurrentPropsFromNode(stateNode);
   if (!props) return null;
-  listener = props[registrationName];
+  stateNode = props[registrationName];
   a: switch (registrationName) {
     case "onClick":
     case "onClickCapture":
@@ -3047,9 +3047,11 @@ function getListener(inst, registrationName) {
       inst = !1;
   }
   if (inst) return null;
-  if (listener && "function" !== typeof listener)
-    throw Error(formatProdErrorMessage(231, registrationName, typeof listener));
-  return listener;
+  if (stateNode && "function" !== typeof stateNode)
+    throw Error(
+      formatProdErrorMessage(231, registrationName, typeof stateNode)
+    );
+  return stateNode;
 }
 function accumulateTwoPhaseListeners(event) {
   var phasedRegistrationNames = event.dispatchConfig.phasedRegistrationNames,
@@ -4098,9 +4100,9 @@ eventPluginOrder = Array.prototype.slice.call(
   )
 );
 recomputePluginOrdering();
-var getInstanceFromNodeImpl$jscomp$inline_531 = getInstanceFromNode$2;
+var getInstanceFromNodeImpl$jscomp$inline_532 = getInstanceFromNode$2;
 getFiberCurrentPropsFromNode = getFiberCurrentPropsFromNode$1;
-getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_531;
+getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_532;
 getNodeFromInstance = getNodeFromInstance$1;
 injectEventPluginsByName({
   SimpleEventPlugin: SimpleEventPlugin,
@@ -5892,8 +5894,8 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
     _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1];
+    setSnapshot = _dispatcher$useState[1],
+    snapshot = _dispatcher$useState[0];
   _dispatcher$useState = workInProgressHook;
   var memoizedState = hook.memoizedState,
     refs = memoizedState.refs,
@@ -9656,11 +9658,6 @@ function performSyncWorkOnRoot(root) {
   ensureRootIsScheduled(root);
   return null;
 }
-function flushRoot(root, expirationTime) {
-  markRootExpiredAtTime(root, expirationTime);
-  ensureRootIsScheduled(root);
-  0 === (executionContext & 48) && flushSyncCallbackQueue();
-}
 function flushDiscreteUpdates() {
   0 === (executionContext & 49) &&
     (flushPendingDiscreteUpdates(), flushPassiveEffects());
@@ -11783,7 +11780,10 @@ attemptSynchronousHydration = function(fiber) {
   switch (fiber.tag) {
     case 3:
       var root$146 = fiber.stateNode;
-      root$146.hydrate && flushRoot(root$146, root$146.firstPendingTime);
+      root$146.hydrate &&
+        (markRootExpiredAtTime(root$146, root$146.firstPendingTime),
+        ensureRootIsScheduled(root$146),
+        0 === (executionContext & 48) && flushSyncCallbackQueue());
       break;
     case 13:
       flushSync(function() {

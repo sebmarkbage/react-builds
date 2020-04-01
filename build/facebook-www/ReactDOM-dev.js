@@ -9696,8 +9696,8 @@ function getSelection(input) {
  */
 
 function setSelection(input, offsets) {
-  var start = offsets.start,
-    end = offsets.end;
+  var start = offsets.start;
+  var end = offsets.end;
 
   if (end === undefined) {
     end = start;
@@ -11547,9 +11547,8 @@ function shouldPreventMouseEvent(name, type, props) {
  */
 
 function getListener(inst, registrationName) {
-  var listener; // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
+  // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
   // live here; needs to be moved to a better place soon
-
   var stateNode = inst.stateNode;
 
   if (!stateNode) {
@@ -11564,7 +11563,7 @@ function getListener(inst, registrationName) {
     return null;
   }
 
-  listener = props[registrationName];
+  var listener = props[registrationName];
 
   if (shouldPreventMouseEvent(registrationName, inst.type, props)) {
     return null;
@@ -19443,8 +19442,10 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
   var _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1]; // Grab a handle to the state hook as well.
+    currentSnapshot = _dispatcher$useState[0],
+    setSnapshot = _dispatcher$useState[1];
+
+  var snapshot = currentSnapshot; // Grab a handle to the state hook as well.
   // We use it to clear the pending update queue if we have a new source.
 
   var stateHook = workInProgressHook;
@@ -31007,7 +31008,6 @@ function createFiberFromTypeAndProps(
   mode,
   expirationTime
 ) {
-  var fiber;
   var fiberTag = IndeterminateComponent; // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
 
   var resolvedType = type;
@@ -31145,7 +31145,7 @@ function createFiberFromTypeAndProps(
     }
   }
 
-  fiber = createFiber(fiberTag, pendingProps, key, mode);
+  var fiber = createFiber(fiberTag, pendingProps, key, mode);
   fiber.elementType = type;
   fiber.type = resolvedType;
   fiber.expirationTime = expirationTime;

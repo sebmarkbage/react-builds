@@ -1694,11 +1694,11 @@ processSimpleEventPluginPairsByPriority(
 );
 processSimpleEventPluginPairsByPriority(continuousPairsForSimpleEventPlugin, 2);
 for (
-  var i$jscomp$inline_301 = 0;
-  i$jscomp$inline_301 < otherDiscreteEvents.length;
-  i$jscomp$inline_301++
+  var i$jscomp$inline_302 = 0;
+  i$jscomp$inline_302 < otherDiscreteEvents.length;
+  i$jscomp$inline_302++
 )
-  eventPriorities.set(otherDiscreteEvents[i$jscomp$inline_301], 0);
+  eventPriorities.set(otherDiscreteEvents[i$jscomp$inline_302], 0);
 var attemptSynchronousHydration,
   attemptUserBlockingHydration,
   attemptContinuousHydration,
@@ -2813,11 +2813,11 @@ function addEventPoolingTo(EventConstructor) {
 var SyntheticCompositionEvent = SyntheticEvent.extend({ data: null }),
   SyntheticInputEvent = SyntheticEvent.extend({ data: null });
 function getListener(inst, registrationName) {
-  var listener = inst.stateNode;
-  if (!listener) return null;
-  var props = getFiberCurrentPropsFromNode(listener);
+  var stateNode = inst.stateNode;
+  if (!stateNode) return null;
+  var props = getFiberCurrentPropsFromNode(stateNode);
   if (!props) return null;
-  listener = props[registrationName];
+  stateNode = props[registrationName];
   a: switch (registrationName) {
     case "onClick":
     case "onClickCapture":
@@ -2844,9 +2844,11 @@ function getListener(inst, registrationName) {
       inst = !1;
   }
   if (inst) return null;
-  if (listener && "function" !== typeof listener)
-    throw Error(formatProdErrorMessage(231, registrationName, typeof listener));
-  return listener;
+  if (stateNode && "function" !== typeof stateNode)
+    throw Error(
+      formatProdErrorMessage(231, registrationName, typeof stateNode)
+    );
+  return stateNode;
 }
 function accumulateTwoPhaseListeners(event) {
   var phasedRegistrationNames = event.dispatchConfig.phasedRegistrationNames,
@@ -3896,9 +3898,9 @@ eventPluginOrder = Array.prototype.slice.call(
   )
 );
 recomputePluginOrdering();
-var getInstanceFromNodeImpl$jscomp$inline_481 = getInstanceFromNode$2;
+var getInstanceFromNodeImpl$jscomp$inline_482 = getInstanceFromNode$2;
 getFiberCurrentPropsFromNode = getFiberCurrentPropsFromNode$1;
-getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_481;
+getInstanceFromNode = getInstanceFromNodeImpl$jscomp$inline_482;
 getNodeFromInstance = getNodeFromInstance$1;
 injectEventPluginsByName({
   SimpleEventPlugin: SimpleEventPlugin,
@@ -5672,8 +5674,8 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
     _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1];
+    setSnapshot = _dispatcher$useState[1],
+    snapshot = _dispatcher$useState[0];
   _dispatcher$useState = workInProgressHook;
   var memoizedState = hook.memoizedState,
     refs = memoizedState.refs,
@@ -9245,11 +9247,6 @@ function performSyncWorkOnRoot(root) {
   ensureRootIsScheduled(root);
   return null;
 }
-function flushRoot(root, expirationTime) {
-  markRootExpiredAtTime(root, expirationTime);
-  ensureRootIsScheduled(root);
-  0 === (executionContext & 48) && flushSyncCallbackQueue();
-}
 function flushDiscreteUpdates() {
   0 === (executionContext & 49) &&
     (flushPendingDiscreteUpdates(), flushPassiveEffects());
@@ -11205,7 +11202,10 @@ attemptSynchronousHydration = function(fiber) {
   switch (fiber.tag) {
     case 3:
       var root$132 = fiber.stateNode;
-      root$132.hydrate && flushRoot(root$132, root$132.firstPendingTime);
+      root$132.hydrate &&
+        (markRootExpiredAtTime(root$132, root$132.firstPendingTime),
+        ensureRootIsScheduled(root$132),
+        0 === (executionContext & 48) && flushSyncCallbackQueue());
       break;
     case 13:
       flushSync(function() {
@@ -11343,8 +11343,8 @@ exports.act = function(callback) {
       "act(...) is not supported in production builds of React, and might not behave as expected."
     ));
   actingUpdatesScopeDepth++;
-  var previousIsSomeRendererActing = IsSomeRendererActing$1.current;
-  var previousIsThisRendererActing = IsThisRendererActing.current;
+  var previousIsSomeRendererActing = IsSomeRendererActing$1.current,
+    previousIsThisRendererActing = IsThisRendererActing.current;
   IsSomeRendererActing$1.current = !0;
   IsThisRendererActing.current = !0;
   try {

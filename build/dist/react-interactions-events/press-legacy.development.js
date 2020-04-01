@@ -108,17 +108,15 @@
       shiftKey = _nativeEvent.shiftKey;
       // Only check for one property, checking for all of them is costly. We can assume
       // if clientX exists, so do the rest.
-      var eventObject;
-      eventObject = touchEvent || nativeEvent;
+      var eventObject = touchEvent || nativeEvent;
 
       if (eventObject) {
-        var _eventObject = eventObject;
-        clientX = _eventObject.clientX;
-        clientY = _eventObject.clientY;
-        pageX = _eventObject.pageX;
-        pageY = _eventObject.pageY;
-        screenX = _eventObject.screenX;
-        screenY = _eventObject.screenY;
+        clientX = eventObject.clientX;
+        clientY = eventObject.clientY;
+        pageX = eventObject.pageX;
+        pageY = eventObject.pageY;
+        screenX = eventObject.screenX;
+        screenY = eventObject.screenY;
       }
     }
 
@@ -534,8 +532,8 @@
     },
     onRootEvent: function (event, context, props, state) {
       var pointerType = event.pointerType,
-          target = event.target,
           type = event.type;
+      var target = event.target;
       var nativeEvent = event.nativeEvent;
       var isPressed = state.isPressed;
       var activePointerId = state.activePointerId;

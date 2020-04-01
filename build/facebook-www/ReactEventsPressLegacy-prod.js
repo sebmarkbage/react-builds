@@ -352,8 +352,8 @@ var PressResponder = React.DEPRECATED_createResponder("Press", {
   },
   onRootEvent: function(event, context, props, state) {
     var pointerType = event.pointerType,
-      target = event.target,
       type = event.type,
+      target = event.target,
       nativeEvent = event.nativeEvent,
       isPressed = state.isPressed,
       activePointerId = state.activePointerId,

@@ -97,11 +97,11 @@ function executeDirectDispatch(event) {
   return dispatchListener;
 }
 function getListener(inst, registrationName) {
-  var listener = inst.stateNode;
-  if (!listener) return null;
-  var props = getFiberCurrentPropsFromNode(listener);
+  var stateNode = inst.stateNode;
+  if (!stateNode) return null;
+  var props = getFiberCurrentPropsFromNode(stateNode);
   if (!props) return null;
-  listener = props[registrationName];
+  stateNode = props[registrationName];
   a: switch (registrationName) {
     case "onClick":
     case "onClickCapture":
@@ -128,15 +128,15 @@ function getListener(inst, registrationName) {
       inst = !1;
   }
   if (inst) return null;
-  if (listener && "function" !== typeof listener)
+  if (stateNode && "function" !== typeof stateNode)
     throw Error(
       "Expected `" +
         registrationName +
         "` listener to be a function, instead got a value of `" +
-        typeof listener +
+        typeof stateNode +
         "` type."
     );
-  return listener;
+  return stateNode;
 }
 function accumulateInto(current, next) {
   if (null == next)
@@ -905,7 +905,7 @@ eventPluginOrder = Array.prototype.slice.call([
   "ReactNativeBridgeEventPlugin"
 ]);
 recomputePluginOrdering();
-var injectedNamesToPlugins$jscomp$inline_189 = {
+var injectedNamesToPlugins$jscomp$inline_191 = {
     ResponderEventPlugin: ResponderEventPlugin,
     ReactNativeBridgeEventPlugin: {
       eventTypes: {},
@@ -940,34 +940,34 @@ var injectedNamesToPlugins$jscomp$inline_189 = {
       }
     }
   },
-  isOrderingDirty$jscomp$inline_190 = !1,
-  pluginName$jscomp$inline_191;
-for (pluginName$jscomp$inline_191 in injectedNamesToPlugins$jscomp$inline_189)
+  isOrderingDirty$jscomp$inline_192 = !1,
+  pluginName$jscomp$inline_193;
+for (pluginName$jscomp$inline_193 in injectedNamesToPlugins$jscomp$inline_191)
   if (
-    injectedNamesToPlugins$jscomp$inline_189.hasOwnProperty(
-      pluginName$jscomp$inline_191
+    injectedNamesToPlugins$jscomp$inline_191.hasOwnProperty(
+      pluginName$jscomp$inline_193
     )
   ) {
-    var pluginModule$jscomp$inline_192 =
-      injectedNamesToPlugins$jscomp$inline_189[pluginName$jscomp$inline_191];
+    var pluginModule$jscomp$inline_194 =
+      injectedNamesToPlugins$jscomp$inline_191[pluginName$jscomp$inline_193];
     if (
-      !namesToPlugins.hasOwnProperty(pluginName$jscomp$inline_191) ||
-      namesToPlugins[pluginName$jscomp$inline_191] !==
-        pluginModule$jscomp$inline_192
+      !namesToPlugins.hasOwnProperty(pluginName$jscomp$inline_193) ||
+      namesToPlugins[pluginName$jscomp$inline_193] !==
+        pluginModule$jscomp$inline_194
     ) {
-      if (namesToPlugins[pluginName$jscomp$inline_191])
+      if (namesToPlugins[pluginName$jscomp$inline_193])
         throw Error(
           "EventPluginRegistry: Cannot inject two different event plugins using the same name, `" +
-            pluginName$jscomp$inline_191 +
+            pluginName$jscomp$inline_193 +
             "`."
         );
       namesToPlugins[
-        pluginName$jscomp$inline_191
-      ] = pluginModule$jscomp$inline_192;
-      isOrderingDirty$jscomp$inline_190 = !0;
+        pluginName$jscomp$inline_193
+      ] = pluginModule$jscomp$inline_194;
+      isOrderingDirty$jscomp$inline_192 = !0;
     }
   }
-isOrderingDirty$jscomp$inline_190 && recomputePluginOrdering();
+isOrderingDirty$jscomp$inline_192 && recomputePluginOrdering();
 function getInstanceFromInstance(instanceHandle) {
   return instanceHandle;
 }
@@ -3364,8 +3364,8 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
     _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1];
+    setSnapshot = _dispatcher$useState[1],
+    snapshot = _dispatcher$useState[0];
   _dispatcher$useState = workInProgressHook;
   var memoizedState = hook.memoizedState,
     refs = memoizedState.refs,

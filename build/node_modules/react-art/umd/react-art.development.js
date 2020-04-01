@@ -1446,8 +1446,7 @@
         return parentContext;
       }
 
-      var childContext;
-      childContext = instance.getChildContext();
+      var childContext = instance.getChildContext();
 
       for (var contextKey in childContext) {
         if (!(contextKey in childContextTypes)) {
@@ -6311,10 +6310,11 @@
     var _dispatcher$useState = dispatcher.useState(function () {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-        snapshot = _dispatcher$useState[0],
-        setSnapshot = _dispatcher$useState[1]; // Grab a handle to the state hook as well.
-    // We use it to clear the pending update queue if we have a new source.
+        currentSnapshot = _dispatcher$useState[0],
+        setSnapshot = _dispatcher$useState[1];
 
+    var snapshot = currentSnapshot; // Grab a handle to the state hook as well.
+    // We use it to clear the pending update queue if we have a new source.
 
     var stateHook = workInProgressHook;
     var memoizedState = hook.memoizedState;
@@ -15431,7 +15431,6 @@
   }
   function createFiberFromTypeAndProps(type, // React$ElementType
   key, pendingProps, owner, mode, expirationTime) {
-    var fiber;
     var fiberTag = IndeterminateComponent; // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
 
     var resolvedType = type;
@@ -15535,7 +15534,7 @@
       }
     }
 
-    fiber = createFiber(fiberTag, pendingProps, key, mode);
+    var fiber = createFiber(fiberTag, pendingProps, key, mode);
     fiber.elementType = type;
     fiber.type = resolvedType;
     fiber.expirationTime = expirationTime;

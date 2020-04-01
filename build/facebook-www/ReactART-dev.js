@@ -7175,8 +7175,10 @@ function useMutableSource(hook, source, getSnapshot, subscribe) {
   var _dispatcher$useState = dispatcher.useState(function() {
       return readFromUnsubcribedMutableSource(root, source, getSnapshot);
     }),
-    snapshot = _dispatcher$useState[0],
-    setSnapshot = _dispatcher$useState[1]; // Grab a handle to the state hook as well.
+    currentSnapshot = _dispatcher$useState[0],
+    setSnapshot = _dispatcher$useState[1];
+
+  var snapshot = currentSnapshot; // Grab a handle to the state hook as well.
   // We use it to clear the pending update queue if we have a new source.
 
   var stateHook = workInProgressHook;
@@ -18114,7 +18116,6 @@ function createFiberFromTypeAndProps(
   mode,
   expirationTime
 ) {
-  var fiber;
   var fiberTag = IndeterminateComponent; // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
 
   var resolvedType = type;
@@ -18252,7 +18253,7 @@ function createFiberFromTypeAndProps(
     }
   }
 
-  fiber = createFiber(fiberTag, pendingProps, key, mode);
+  var fiber = createFiber(fiberTag, pendingProps, key, mode);
   fiber.elementType = type;
   fiber.type = resolvedType;
   fiber.expirationTime = expirationTime;
