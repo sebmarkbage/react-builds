@@ -11,32 +11,47 @@
  */
 
 "use strict";
-var hasSymbol = "function" === typeof Symbol && Symbol.for,
-  REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 60103,
-  REACT_PORTAL_TYPE = hasSymbol ? Symbol.for("react.portal") : 60106,
-  REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 60107,
-  REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for("react.strict_mode") : 60108,
-  REACT_PROFILER_TYPE = hasSymbol ? Symbol.for("react.profiler") : 60114,
-  REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for("react.provider") : 60109,
-  REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for("react.context") : 60110,
-  REACT_ASYNC_MODE_TYPE = hasSymbol ? Symbol.for("react.async_mode") : 60111,
-  REACT_CONCURRENT_MODE_TYPE = hasSymbol
-    ? Symbol.for("react.concurrent_mode")
-    : 60111,
-  REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for("react.forward_ref") : 60112,
-  REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for("react.suspense") : 60113,
-  REACT_SUSPENSE_LIST_TYPE = hasSymbol
-    ? Symbol.for("react.suspense_list")
-    : 60120,
-  REACT_MEMO_TYPE = hasSymbol ? Symbol.for("react.memo") : 60115,
-  REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 60116,
-  REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 60121,
-  REACT_SERVER_BLOCK_TYPE = hasSymbol
-    ? Symbol.for("react.server.block")
-    : 60122,
-  REACT_FUNDAMENTAL_TYPE = hasSymbol ? Symbol.for("react.fundamental") : 60117,
-  REACT_RESPONDER_TYPE = hasSymbol ? Symbol.for("react.responder") : 60118,
-  REACT_SCOPE_TYPE = hasSymbol ? Symbol.for("react.scope") : 60119;
+var REACT_ELEMENT_TYPE = 60103,
+  REACT_PORTAL_TYPE = 60106,
+  REACT_FRAGMENT_TYPE = 60107,
+  REACT_STRICT_MODE_TYPE = 60108,
+  REACT_PROFILER_TYPE = 60114,
+  REACT_PROVIDER_TYPE = 60109,
+  REACT_CONTEXT_TYPE = 60110,
+  REACT_ASYNC_MODE_TYPE = 60111,
+  REACT_CONCURRENT_MODE_TYPE = 60111,
+  REACT_FORWARD_REF_TYPE = 60112,
+  REACT_SUSPENSE_TYPE = 60113,
+  REACT_SUSPENSE_LIST_TYPE = 60120,
+  REACT_MEMO_TYPE = 60115,
+  REACT_LAZY_TYPE = 60116,
+  REACT_BLOCK_TYPE = 60121,
+  REACT_SERVER_BLOCK_TYPE = 60122,
+  REACT_FUNDAMENTAL_TYPE = 60117,
+  REACT_RESPONDER_TYPE = 60118,
+  REACT_SCOPE_TYPE = 60119;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_ELEMENT_TYPE = symbolFor("react.element");
+  REACT_PORTAL_TYPE = symbolFor("react.portal");
+  REACT_FRAGMENT_TYPE = symbolFor("react.fragment");
+  REACT_STRICT_MODE_TYPE = symbolFor("react.strict_mode");
+  REACT_PROFILER_TYPE = symbolFor("react.profiler");
+  REACT_PROVIDER_TYPE = symbolFor("react.provider");
+  REACT_CONTEXT_TYPE = symbolFor("react.context");
+  REACT_ASYNC_MODE_TYPE = symbolFor("react.async_mode");
+  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
+  REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
+  REACT_SUSPENSE_TYPE = symbolFor("react.suspense");
+  REACT_SUSPENSE_LIST_TYPE = symbolFor("react.suspense_list");
+  REACT_MEMO_TYPE = symbolFor("react.memo");
+  REACT_LAZY_TYPE = symbolFor("react.lazy");
+  REACT_BLOCK_TYPE = symbolFor("react.block");
+  REACT_SERVER_BLOCK_TYPE = symbolFor("react.server.block");
+  REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
+  REACT_RESPONDER_TYPE = symbolFor("react.responder");
+  REACT_SCOPE_TYPE = symbolFor("react.scope");
+}
 function typeOf(object) {
   if ("object" === typeof object && null !== object) {
     var $$typeof = object.$$typeof;
@@ -67,22 +82,34 @@ function typeOf(object) {
     }
   }
 }
+var ConcurrentMode = REACT_CONCURRENT_MODE_TYPE,
+  ContextConsumer = REACT_CONTEXT_TYPE,
+  ContextProvider = REACT_PROVIDER_TYPE,
+  Element = REACT_ELEMENT_TYPE,
+  ForwardRef = REACT_FORWARD_REF_TYPE,
+  Fragment = REACT_FRAGMENT_TYPE,
+  Lazy = REACT_LAZY_TYPE,
+  Memo = REACT_MEMO_TYPE,
+  Portal = REACT_PORTAL_TYPE,
+  Profiler = REACT_PROFILER_TYPE,
+  StrictMode = REACT_STRICT_MODE_TYPE,
+  Suspense = REACT_SUSPENSE_TYPE;
 function isConcurrentMode(object) {
   return typeOf(object) === REACT_CONCURRENT_MODE_TYPE;
 }
 exports.AsyncMode = REACT_ASYNC_MODE_TYPE;
-exports.ConcurrentMode = REACT_CONCURRENT_MODE_TYPE;
-exports.ContextConsumer = REACT_CONTEXT_TYPE;
-exports.ContextProvider = REACT_PROVIDER_TYPE;
-exports.Element = REACT_ELEMENT_TYPE;
-exports.ForwardRef = REACT_FORWARD_REF_TYPE;
-exports.Fragment = REACT_FRAGMENT_TYPE;
-exports.Lazy = REACT_LAZY_TYPE;
-exports.Memo = REACT_MEMO_TYPE;
-exports.Portal = REACT_PORTAL_TYPE;
-exports.Profiler = REACT_PROFILER_TYPE;
-exports.StrictMode = REACT_STRICT_MODE_TYPE;
-exports.Suspense = REACT_SUSPENSE_TYPE;
+exports.ConcurrentMode = ConcurrentMode;
+exports.ContextConsumer = ContextConsumer;
+exports.ContextProvider = ContextProvider;
+exports.Element = Element;
+exports.ForwardRef = ForwardRef;
+exports.Fragment = Fragment;
+exports.Lazy = Lazy;
+exports.Memo = Memo;
+exports.Portal = Portal;
+exports.Profiler = Profiler;
+exports.StrictMode = StrictMode;
+exports.Suspense = Suspense;
 exports.isAsyncMode = function(object) {
   return isConcurrentMode(object) || typeOf(object) === REACT_ASYNC_MODE_TYPE;
 };

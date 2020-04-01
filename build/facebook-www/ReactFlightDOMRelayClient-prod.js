@@ -12,10 +12,15 @@
 
 "use strict";
 var ReactFlightDOMRelayClientIntegration = require("ReactFlightDOMRelayClientIntegration"),
-  hasSymbol = "function" === typeof Symbol && Symbol.for,
-  REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 60103,
-  REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 60116,
-  REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 60121;
+  REACT_ELEMENT_TYPE = 60103,
+  REACT_LAZY_TYPE = 60116,
+  REACT_BLOCK_TYPE = 60121;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_ELEMENT_TYPE = symbolFor("react.element");
+  REACT_LAZY_TYPE = symbolFor("react.lazy");
+  REACT_BLOCK_TYPE = symbolFor("react.block");
+}
 function Chunk(status, value) {
   this._status = status;
   this._value = value;

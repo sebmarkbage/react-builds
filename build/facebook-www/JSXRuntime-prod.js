@@ -12,9 +12,13 @@
 
 "use strict";
 var React = require("react"),
-  hasSymbol = "function" === typeof Symbol && Symbol.for,
-  REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 60103,
-  REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 60107;
+  REACT_ELEMENT_TYPE = 60103;
+exports.Fragment = 60107;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_ELEMENT_TYPE = symbolFor("react.element");
+  exports.Fragment = symbolFor("react.fragment");
+}
 require("ReactFeatureFlags");
 var ReactCurrentOwner =
     React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner,
@@ -44,6 +48,5 @@ function jsx(type, config, maybeKey) {
     _owner: ReactCurrentOwner.current
   };
 }
-exports.Fragment = REACT_FRAGMENT_TYPE;
 exports.jsx = jsx;
 exports.jsxs = jsx;

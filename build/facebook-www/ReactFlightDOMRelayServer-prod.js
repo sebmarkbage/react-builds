@@ -69,14 +69,19 @@ function writeChunk(destination, chunk) {
       );
   return !0;
 }
-var hasSymbol = "function" === typeof Symbol && Symbol.for,
-  REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 60103,
-  REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 60107,
-  REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 60116,
-  REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 60121,
-  REACT_SERVER_BLOCK_TYPE = hasSymbol
-    ? Symbol.for("react.server.block")
-    : 60122;
+var REACT_ELEMENT_TYPE = 60103,
+  REACT_FRAGMENT_TYPE = 60107,
+  REACT_LAZY_TYPE = 60116,
+  REACT_BLOCK_TYPE = 60121,
+  REACT_SERVER_BLOCK_TYPE = 60122;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_ELEMENT_TYPE = symbolFor("react.element");
+  REACT_FRAGMENT_TYPE = symbolFor("react.fragment");
+  REACT_LAZY_TYPE = symbolFor("react.lazy");
+  REACT_BLOCK_TYPE = symbolFor("react.block");
+  REACT_SERVER_BLOCK_TYPE = symbolFor("react.server.block");
+}
 function createRequest(model, destination, bundlerConfig) {
   var pingedSegments = [],
     request = {
@@ -141,22 +146,22 @@ function resolveModelToJSON(request, parent, key, value) {
         parent = value;
         try {
           return parent();
-        } catch (x) {
+        } catch (x$1) {
           if (
-            "object" === typeof x &&
-            null !== x &&
-            "function" === typeof x.then
+            "object" === typeof x$1 &&
+            null !== x$1 &&
+            "function" === typeof x$1.then
           )
             return (
               request.pendingChunks++,
               (request = createSegment(request, parent)),
               (parent = request.ping),
-              x.then(parent, parent),
+              x$1.then(parent, parent),
               "$" + request.id.toString(16)
             );
           request.pendingChunks++;
           parent = request.nextChunkId++;
-          emitErrorChunk(request, parent, x);
+          emitErrorChunk(request, parent, x$1);
           return "$" + parent.toString(16);
         }
       default:
@@ -214,9 +219,9 @@ function performWork(request$jscomp$0) {
       segment = pingedSegments[i],
       query = segment.query;
     try {
-      var _value = query(),
+      var value = query(),
         id = segment.id,
-        json = convertModelToJSON(request, {}, "", _value);
+        json = convertModelToJSON(request, {}, "", value);
       request.completedJSONChunks.push({ type: "json", id: id, json: json });
     } catch (x) {
       "object" === typeof x && null !== x && "function" === typeof x.then

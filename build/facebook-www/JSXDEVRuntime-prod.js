@@ -12,10 +12,10 @@
 
 "use strict";
 require("react");
-var REACT_FRAGMENT_TYPE =
-  "function" === typeof Symbol && Symbol.for
-    ? Symbol.for("react.fragment")
-    : 60107;
+exports.Fragment = 60107;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  exports.Fragment = symbolFor("react.fragment");
+}
 require("ReactFeatureFlags");
-exports.Fragment = REACT_FRAGMENT_TYPE;
 exports.jsxDEV = void 0;

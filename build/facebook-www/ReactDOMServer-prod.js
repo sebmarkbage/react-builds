@@ -28,26 +28,39 @@ function formatProdErrorMessage(code) {
     " for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
   );
 }
-var hasSymbol = "function" === typeof Symbol && Symbol.for,
-  REACT_PORTAL_TYPE = hasSymbol ? Symbol.for("react.portal") : 60106,
-  REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 60107,
-  REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for("react.strict_mode") : 60108,
-  REACT_PROFILER_TYPE = hasSymbol ? Symbol.for("react.profiler") : 60114,
-  REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for("react.provider") : 60109,
-  REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for("react.context") : 60110,
-  REACT_CONCURRENT_MODE_TYPE = hasSymbol
-    ? Symbol.for("react.concurrent_mode")
-    : 60111,
-  REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for("react.forward_ref") : 60112,
-  REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for("react.suspense") : 60113,
-  REACT_SUSPENSE_LIST_TYPE = hasSymbol
-    ? Symbol.for("react.suspense_list")
-    : 60120,
-  REACT_MEMO_TYPE = hasSymbol ? Symbol.for("react.memo") : 60115,
-  REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 60116,
-  REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 60121,
-  REACT_FUNDAMENTAL_TYPE = hasSymbol ? Symbol.for("react.fundamental") : 60117,
-  REACT_SCOPE_TYPE = hasSymbol ? Symbol.for("react.scope") : 60119;
+var REACT_PORTAL_TYPE = 60106,
+  REACT_FRAGMENT_TYPE = 60107,
+  REACT_STRICT_MODE_TYPE = 60108,
+  REACT_PROFILER_TYPE = 60114,
+  REACT_PROVIDER_TYPE = 60109,
+  REACT_CONTEXT_TYPE = 60110,
+  REACT_CONCURRENT_MODE_TYPE = 60111,
+  REACT_FORWARD_REF_TYPE = 60112,
+  REACT_SUSPENSE_TYPE = 60113,
+  REACT_SUSPENSE_LIST_TYPE = 60120,
+  REACT_MEMO_TYPE = 60115,
+  REACT_LAZY_TYPE = 60116,
+  REACT_BLOCK_TYPE = 60121,
+  REACT_FUNDAMENTAL_TYPE = 60117,
+  REACT_SCOPE_TYPE = 60119;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_PORTAL_TYPE = symbolFor("react.portal");
+  REACT_FRAGMENT_TYPE = symbolFor("react.fragment");
+  REACT_STRICT_MODE_TYPE = symbolFor("react.strict_mode");
+  REACT_PROFILER_TYPE = symbolFor("react.profiler");
+  REACT_PROVIDER_TYPE = symbolFor("react.provider");
+  REACT_CONTEXT_TYPE = symbolFor("react.context");
+  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
+  REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
+  REACT_SUSPENSE_TYPE = symbolFor("react.suspense");
+  REACT_SUSPENSE_LIST_TYPE = symbolFor("react.suspense_list");
+  REACT_MEMO_TYPE = symbolFor("react.memo");
+  REACT_LAZY_TYPE = symbolFor("react.lazy");
+  REACT_BLOCK_TYPE = symbolFor("react.block");
+  REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
+  REACT_SCOPE_TYPE = symbolFor("react.scope");
+}
 function getComponentName(type) {
   if (null == type) return null;
   if ("function" === typeof type) return type.displayName || type.name || null;
@@ -366,26 +379,31 @@ function escapeTextForBrowser(text) {
   return text;
 }
 function createMarkupForProperty(name, value) {
-  var propertyInfo = properties.hasOwnProperty(name) ? properties[name] : null;
+  var JSCompiler_inline_result = properties.hasOwnProperty(name)
+    ? properties[name]
+    : null;
   var JSCompiler_temp;
   if ((JSCompiler_temp = "style" !== name))
     JSCompiler_temp =
-      null !== propertyInfo
-        ? 0 === propertyInfo.type
+      null !== JSCompiler_inline_result
+        ? 0 === JSCompiler_inline_result.type
         : !(2 < name.length) ||
           ("o" !== name[0] && "O" !== name[0]) ||
           ("n" !== name[1] && "N" !== name[1])
         ? !1
         : !0;
-  if (JSCompiler_temp || shouldRemoveAttribute(name, value, propertyInfo, !1))
+  if (
+    JSCompiler_temp ||
+    shouldRemoveAttribute(name, value, JSCompiler_inline_result, !1)
+  )
     return "";
-  if (null !== propertyInfo) {
-    name = propertyInfo.attributeName;
-    JSCompiler_temp = propertyInfo.type;
+  if (null !== JSCompiler_inline_result) {
+    name = JSCompiler_inline_result.attributeName;
+    JSCompiler_temp = JSCompiler_inline_result.type;
     if (3 === JSCompiler_temp || (4 === JSCompiler_temp && !0 === value))
       return name + '=""';
     if (
-      propertyInfo.sanitizeURL &&
+      JSCompiler_inline_result.sanitizeURL &&
       ((value = "" + value), isJavaScriptProtocol.test(value))
     )
       throw Error(formatProdErrorMessage(323, ""));
@@ -514,24 +532,17 @@ var currentThreadID = 0,
       if (null !== workInProgressHook) {
         var prevState = workInProgressHook.memoizedState;
         if (null !== prevState && null !== deps) {
-          a: {
-            var JSCompiler_inline_result = prevState[1];
-            if (null === JSCompiler_inline_result)
-              JSCompiler_inline_result = !1;
-            else {
-              for (
-                var i = 0;
-                i < JSCompiler_inline_result.length && i < deps.length;
-                i++
-              )
-                if (!objectIs(deps[i], JSCompiler_inline_result[i])) {
-                  JSCompiler_inline_result = !1;
-                  break a;
-                }
-              JSCompiler_inline_result = !0;
-            }
+          var prevDeps = prevState[1];
+          a: if (null === prevDeps) prevDeps = !1;
+          else {
+            for (var i$1 = 0; i$1 < prevDeps.length && i$1 < deps.length; i$1++)
+              if (!objectIs(deps[i$1], prevDeps[i$1])) {
+                prevDeps = !1;
+                break a;
+              }
+            prevDeps = !0;
           }
-          if (JSCompiler_inline_result) return prevState[0];
+          if (prevDeps) return prevState[0];
         }
       }
       nextCreate = nextCreate();
@@ -1039,18 +1050,18 @@ var ReactDOMServerRenderer = (function() {
       switch (elementType.$$typeof) {
         case REACT_FORWARD_REF_TYPE:
           currentlyRenderingComponent = {};
-          var _nextChildren4 = elementType.render(child.props, child.ref);
-          _nextChildren4 = finishHooks(
+          var nextChildren$12 = elementType.render(child.props, child.ref);
+          nextChildren$12 = finishHooks(
             elementType.render,
             child.props,
-            _nextChildren4,
+            nextChildren$12,
             child.ref
           );
-          _nextChildren4 = toArray(_nextChildren4);
+          nextChildren$12 = toArray(nextChildren$12);
           this.stack.push({
             type: null,
             domNamespace: parentNamespace,
-            children: _nextChildren4,
+            children: nextChildren$12,
             childIndex: 0,
             context: context,
             footer: ""
@@ -1091,10 +1102,12 @@ var ReactDOMServerRenderer = (function() {
           );
         case REACT_CONTEXT_TYPE:
           elementType = child.type;
-          _nextChildren4 = child.props;
+          nextChildren$12 = child.props;
           var threadID = this.threadID;
           validateContextBounds(elementType, threadID);
-          elementType = toArray(_nextChildren4.children(elementType[threadID]));
+          elementType = toArray(
+            nextChildren$12.children(elementType[threadID])
+          );
           this.stack.push({
             type: child,
             domNamespace: parentNamespace,
@@ -1109,8 +1122,8 @@ var ReactDOMServerRenderer = (function() {
         case REACT_LAZY_TYPE:
           return (
             (elementType = child.type),
-            (_nextChildren4 = elementType._init),
-            (elementType = _nextChildren4(elementType._payload)),
+            (nextChildren$12 = elementType._init),
+            (elementType = nextChildren$12(elementType._payload)),
             (child = [
               React.createElement(
                 elementType,
@@ -1286,14 +1299,10 @@ var ReactDOMServerRenderer = (function() {
             propValue = serialized || null;
           }
           j = null;
-          b: if (
-            ((isCustomProperty = tag),
-            (styleValue = initialValue),
-            -1 === isCustomProperty.indexOf("-"))
-          )
-            isCustomProperty = "string" === typeof styleValue.is;
+          b: if (((isCustomProperty = initialValue), -1 === tag.indexOf("-")))
+            isCustomProperty = "string" === typeof isCustomProperty.is;
           else
-            switch (isCustomProperty) {
+            switch (tag) {
               case "annotation-xml":
               case "color-profile":
               case "font-face":

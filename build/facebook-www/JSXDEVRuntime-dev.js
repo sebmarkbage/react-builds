@@ -20,37 +20,51 @@ var React = require("react");
 
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
 // nor polyfill, then a plain number is used for performance.
-var hasSymbol = typeof Symbol === "function" && Symbol.for;
-var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for("react.element") : 0xeac7;
-var REACT_PORTAL_TYPE = hasSymbol ? Symbol.for("react.portal") : 0xeaca;
-var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for("react.fragment") : 0xeacb;
-var REACT_STRICT_MODE_TYPE = hasSymbol
-  ? Symbol.for("react.strict_mode")
-  : 0xeacc;
-var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for("react.profiler") : 0xead2;
-var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for("react.provider") : 0xeacd;
-var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for("react.context") : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-var REACT_CONCURRENT_MODE_TYPE = hasSymbol
-  ? Symbol.for("react.concurrent_mode")
-  : 0xeacf;
-var REACT_FORWARD_REF_TYPE = hasSymbol
-  ? Symbol.for("react.forward_ref")
-  : 0xead0;
-var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for("react.suspense") : 0xead1;
-var REACT_SUSPENSE_LIST_TYPE = hasSymbol
-  ? Symbol.for("react.suspense_list")
-  : 0xead8;
-var REACT_MEMO_TYPE = hasSymbol ? Symbol.for("react.memo") : 0xead3;
-var REACT_LAZY_TYPE = hasSymbol ? Symbol.for("react.lazy") : 0xead4;
-var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for("react.block") : 0xead9;
-var REACT_SERVER_BLOCK_TYPE = hasSymbol
-  ? Symbol.for("react.server.block")
-  : 0xeada;
-var REACT_FUNDAMENTAL_TYPE = hasSymbol
-  ? Symbol.for("react.fundamental")
-  : 0xead5;
-var REACT_RESPONDER_TYPE = hasSymbol ? Symbol.for("react.responder") : 0xead6;
-var REACT_SCOPE_TYPE = hasSymbol ? Symbol.for("react.scope") : 0xead7;
+var REACT_ELEMENT_TYPE = 0xeac7;
+var REACT_PORTAL_TYPE = 0xeaca;
+exports.Fragment = 0xeacb;
+var REACT_STRICT_MODE_TYPE = 0xeacc;
+var REACT_PROFILER_TYPE = 0xead2;
+var REACT_PROVIDER_TYPE = 0xeacd;
+var REACT_CONTEXT_TYPE = 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
+// (unstable) APIs that have been removed. Can we remove the symbols?
+
+var REACT_ASYNC_MODE_TYPE = 0xeacf;
+var REACT_CONCURRENT_MODE_TYPE = 0xeacf;
+var REACT_FORWARD_REF_TYPE = 0xead0;
+var REACT_SUSPENSE_TYPE = 0xead1;
+var REACT_SUSPENSE_LIST_TYPE = 0xead8;
+var REACT_MEMO_TYPE = 0xead3;
+var REACT_LAZY_TYPE = 0xead4;
+var REACT_BLOCK_TYPE = 0xead9;
+var REACT_SERVER_BLOCK_TYPE = 0xeada;
+var REACT_FUNDAMENTAL_TYPE = 0xead5;
+var REACT_RESPONDER_TYPE = 0xead6;
+var REACT_SCOPE_TYPE = 0xead7;
+
+if (typeof Symbol === "function" && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_ELEMENT_TYPE = symbolFor("react.element");
+  REACT_PORTAL_TYPE = symbolFor("react.portal");
+  exports.Fragment = symbolFor("react.fragment");
+  REACT_STRICT_MODE_TYPE = symbolFor("react.strict_mode");
+  REACT_PROFILER_TYPE = symbolFor("react.profiler");
+  REACT_PROVIDER_TYPE = symbolFor("react.provider");
+  REACT_CONTEXT_TYPE = symbolFor("react.context");
+  REACT_ASYNC_MODE_TYPE = symbolFor("react.async_mode");
+  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
+  REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
+  REACT_SUSPENSE_TYPE = symbolFor("react.suspense");
+  REACT_SUSPENSE_LIST_TYPE = symbolFor("react.suspense_list");
+  REACT_MEMO_TYPE = symbolFor("react.memo");
+  REACT_LAZY_TYPE = symbolFor("react.lazy");
+  REACT_BLOCK_TYPE = symbolFor("react.block");
+  REACT_SERVER_BLOCK_TYPE = symbolFor("react.server.block");
+  REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
+  REACT_RESPONDER_TYPE = symbolFor("react.responder");
+  REACT_SCOPE_TYPE = symbolFor("react.scope");
+}
+
 var MAYBE_ITERATOR_SYMBOL = typeof Symbol === "function" && Symbol.iterator;
 var FAUX_ITERATOR_SYMBOL = "@@iterator";
 function getIteratorFn(maybeIterable) {
@@ -122,7 +136,7 @@ function isValidElementType(type) {
   return (
     typeof type === "string" ||
     typeof type === "function" || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
-    type === REACT_FRAGMENT_TYPE ||
+    type === exports.Fragment ||
     type === REACT_CONCURRENT_MODE_TYPE ||
     type === REACT_PROFILER_TYPE ||
     type === REACT_STRICT_MODE_TYPE ||
@@ -179,7 +193,7 @@ function getComponentName(type) {
   }
 
   switch (type) {
-    case REACT_FRAGMENT_TYPE:
+    case exports.Fragment:
       return "Fragment";
 
     case REACT_PORTAL_TYPE:
@@ -969,7 +983,7 @@ function jsxWithValidation(type, props, key, isStaticChildren, source, self) {
       }
     }
 
-    if (type === REACT_FRAGMENT_TYPE) {
+    if (type === exports.Fragment) {
       validateFragmentProps(element);
     } else {
       validatePropTypes(element);
@@ -981,7 +995,6 @@ function jsxWithValidation(type, props, key, isStaticChildren, source, self) {
 
 var jsxDEV$1 = jsxWithValidation;
 
-exports.Fragment = REACT_FRAGMENT_TYPE;
 exports.jsxDEV = jsxDEV$1;
 
   })();

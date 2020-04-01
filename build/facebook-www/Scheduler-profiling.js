@@ -14,7 +14,7 @@
 var _require = require("SchedulerFeatureFlags"),
   enableIsInputPending = _require.enableIsInputPending,
   enableSchedulerDebugging = _require.enableSchedulerDebugging,
-  enableProfiling = _require.enableProfiling,
+  enableProfilingFeatureFlag = _require.enableProfiling,
   requestHostCallback,
   requestHostTimeout,
   cancelHostTimeout,
@@ -54,9 +54,9 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
   requestPaint = exports.unstable_forceFrameRate = function() {};
 } else {
   var performance = window.performance,
-    _Date = window.Date,
-    _setTimeout = window.setTimeout,
-    _clearTimeout = window.clearTimeout;
+    Date$0 = window.Date,
+    setTimeout$1 = window.setTimeout,
+    clearTimeout$2 = window.clearTimeout;
   if ("undefined" !== typeof console) {
     var cancelAnimationFrame = window.cancelAnimationFrame;
     "function" !== typeof window.requestAnimationFrame &&
@@ -73,9 +73,9 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
       return performance.now();
     };
   else {
-    var _initialTime = _Date.now();
+    var initialTime$3 = Date$0.now();
     exports.unstable_now = function() {
-      return _Date.now() - _initialTime;
+      return Date$0.now() - initialTime$3;
     };
   }
   var isMessageLoopRunning = !1,
@@ -136,12 +136,12 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
       ((isMessageLoopRunning = !0), port.postMessage(null));
   };
   requestHostTimeout = function(callback, ms) {
-    taskTimeoutID = _setTimeout(function() {
+    taskTimeoutID = setTimeout$1(function() {
       callback(exports.unstable_now());
     }, ms);
   };
   cancelHostTimeout = function() {
-    _clearTimeout(taskTimeoutID);
+    clearTimeout$2(taskTimeoutID);
     taskTimeoutID = -1;
   };
 }
@@ -196,7 +196,7 @@ function compare(a, b) {
 }
 var runIdCounter = 0,
   mainThreadIdCounter = 0,
-  sharedProfilingBuffer = enableProfiling
+  sharedProfilingBuffer = enableProfilingFeatureFlag
     ? "function" === typeof SharedArrayBuffer
       ? new SharedArrayBuffer(4 * Int32Array.BYTES_PER_ELEMENT)
       : "function" === typeof ArrayBuffer
@@ -204,10 +204,10 @@ var runIdCounter = 0,
       : null
     : null,
   profilingState =
-    enableProfiling && null !== sharedProfilingBuffer
+    enableProfilingFeatureFlag && null !== sharedProfilingBuffer
       ? new Int32Array(sharedProfilingBuffer)
       : [];
-enableProfiling &&
+enableProfilingFeatureFlag &&
   ((profilingState[0] = 0), (profilingState[3] = 0), (profilingState[1] = 0));
 var eventLogSize = 0,
   eventLogBuffer = null,
@@ -248,7 +248,7 @@ function stopLoggingProfilingEvents() {
   return buffer;
 }
 function markTaskStart(task, ms) {
-  enableProfiling &&
+  enableProfilingFeatureFlag &&
     (profilingState[3]++,
     null !== eventLog && logEvent([1, 1e3 * ms, task.id, task.priorityLevel]));
 }
@@ -268,7 +268,7 @@ function advanceTimers(currentTime) {
       pop(timerQueue),
         (timer.sortIndex = timer.expirationTime),
         push(taskQueue, timer),
-        enableProfiling &&
+        enableProfilingFeatureFlag &&
           (markTaskStart(timer, currentTime), (timer.isQueued = !0));
     else break;
     timer = peek(timerQueue);
@@ -287,8 +287,8 @@ function handleTimeout(currentTime) {
     }
 }
 function flushWork(hasTimeRemaining, initialTime) {
-  enableProfiling &&
-    enableProfiling &&
+  enableProfilingFeatureFlag &&
+    enableProfilingFeatureFlag &&
     null !== eventLog &&
     logEvent([8, 1e3 * initialTime, mainThreadIdCounter]);
   isHostCallbackScheduled = !1;
@@ -297,14 +297,14 @@ function flushWork(hasTimeRemaining, initialTime) {
   isPerformingWork = !0;
   var previousPriorityLevel = currentPriorityLevel;
   try {
-    if (enableProfiling)
+    if (enableProfilingFeatureFlag)
       try {
         return workLoop(hasTimeRemaining, initialTime);
       } catch (error) {
         if (null !== currentTask) {
           var currentTime = exports.unstable_now();
           hasTimeRemaining = currentTask;
-          enableProfiling &&
+          enableProfilingFeatureFlag &&
             ((profilingState[0] = 0),
             (profilingState[1] = 0),
             profilingState[3]--,
@@ -319,9 +319,9 @@ function flushWork(hasTimeRemaining, initialTime) {
     (currentTask = null),
       (currentPriorityLevel = previousPriorityLevel),
       (isPerformingWork = !1),
-      enableProfiling &&
+      enableProfilingFeatureFlag &&
         ((previousPriorityLevel = exports.unstable_now()),
-        enableProfiling &&
+        enableProfilingFeatureFlag &&
           (mainThreadIdCounter++,
           null !== eventLog &&
             logEvent([7, 1e3 * previousPriorityLevel, mainThreadIdCounter])));
@@ -345,7 +345,7 @@ function workLoop(hasTimeRemaining, initialTime) {
       currentPriorityLevel = currentTask.priorityLevel;
       var didUserCallbackTimeout = currentTask.expirationTime <= initialTime,
         task = currentTask;
-      enableProfiling &&
+      enableProfilingFeatureFlag &&
         (runIdCounter++,
         (profilingState[0] = task.priorityLevel),
         (profilingState[1] = task.id),
@@ -358,7 +358,7 @@ function workLoop(hasTimeRemaining, initialTime) {
         ? ((currentTask.callback = callback),
           (callback = currentTask),
           (didUserCallbackTimeout = initialTime),
-          enableProfiling &&
+          enableProfilingFeatureFlag &&
             ((profilingState[0] = 0),
             (profilingState[1] = 0),
             (profilingState[2] = 0),
@@ -369,10 +369,10 @@ function workLoop(hasTimeRemaining, initialTime) {
                 callback.id,
                 runIdCounter
               ])))
-        : (enableProfiling &&
+        : (enableProfilingFeatureFlag &&
             ((callback = currentTask),
             (didUserCallbackTimeout = initialTime),
-            enableProfiling &&
+            enableProfilingFeatureFlag &&
               ((profilingState[0] = 0),
               (profilingState[1] = 0),
               profilingState[3]--,
@@ -405,7 +405,7 @@ function timeoutForPriorityLevel(priorityLevel) {
   }
 }
 var unstable_requestPaint = requestPaint,
-  unstable_Profiling = enableProfiling
+  unstable_Profiling = enableProfilingFeatureFlag
     ? {
         startLoggingProfilingEvents: startLoggingProfilingEvents,
         stopLoggingProfilingEvents: stopLoggingProfilingEvents,
@@ -419,9 +419,9 @@ exports.unstable_NormalPriority = 3;
 exports.unstable_Profiling = unstable_Profiling;
 exports.unstable_UserBlockingPriority = 2;
 exports.unstable_cancelCallback = function(task) {
-  if (enableProfiling && task.isQueued) {
+  if (enableProfilingFeatureFlag && task.isQueued) {
     var currentTime = exports.unstable_now();
-    enableProfiling &&
+    enableProfilingFeatureFlag &&
       (profilingState[3]--,
       null !== eventLog && logEvent([4, 1e3 * currentTime, task.id]));
     task.isQueued = !1;
@@ -505,7 +505,7 @@ exports.unstable_scheduleCallback = function(priorityLevel, callback, options) {
     expirationTime: options,
     sortIndex: -1
   };
-  enableProfiling && (priorityLevel.isQueued = !1);
+  enableProfilingFeatureFlag && (priorityLevel.isQueued = !1);
   startTime > currentTime
     ? ((priorityLevel.sortIndex = startTime),
       push(timerQueue, priorityLevel),
@@ -517,7 +517,7 @@ exports.unstable_scheduleCallback = function(priorityLevel, callback, options) {
         requestHostTimeout(handleTimeout, startTime - currentTime)))
     : ((priorityLevel.sortIndex = options),
       push(taskQueue, priorityLevel),
-      enableProfiling &&
+      enableProfilingFeatureFlag &&
         (markTaskStart(priorityLevel, currentTime),
         (priorityLevel.isQueued = !0)),
       isHostCallbackScheduled ||

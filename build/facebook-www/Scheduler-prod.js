@@ -53,9 +53,9 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
   requestPaint = exports.unstable_forceFrameRate = function() {};
 } else {
   var performance = window.performance,
-    _Date = window.Date,
-    _setTimeout = window.setTimeout,
-    _clearTimeout = window.clearTimeout;
+    Date$0 = window.Date,
+    setTimeout$1 = window.setTimeout,
+    clearTimeout$2 = window.clearTimeout;
   if ("undefined" !== typeof console) {
     var cancelAnimationFrame = window.cancelAnimationFrame;
     "function" !== typeof window.requestAnimationFrame &&
@@ -72,9 +72,9 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
       return performance.now();
     };
   else {
-    var _initialTime = _Date.now();
+    var initialTime$3 = Date$0.now();
     exports.unstable_now = function() {
-      return _Date.now() - _initialTime;
+      return Date$0.now() - initialTime$3;
     };
   }
   var isMessageLoopRunning = !1,
@@ -135,12 +135,12 @@ if ("undefined" === typeof window || "function" !== typeof MessageChannel) {
       ((isMessageLoopRunning = !0), port.postMessage(null));
   };
   requestHostTimeout = function(callback, ms) {
-    taskTimeoutID = _setTimeout(function() {
+    taskTimeoutID = setTimeout$1(function() {
       callback(exports.unstable_now());
     }, ms);
   };
   cancelHostTimeout = function() {
-    _clearTimeout(taskTimeoutID);
+    clearTimeout$2(taskTimeoutID);
     taskTimeoutID = -1;
   };
 }

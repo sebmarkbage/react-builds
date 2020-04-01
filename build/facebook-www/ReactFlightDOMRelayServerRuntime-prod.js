@@ -11,10 +11,11 @@
  */
 
 "use strict";
-var REACT_SERVER_BLOCK_TYPE =
-  "function" === typeof Symbol && Symbol.for
-    ? Symbol.for("react.server.block")
-    : 60122;
+var REACT_SERVER_BLOCK_TYPE = 60122;
+if ("function" === typeof Symbol && Symbol.for) {
+  var symbolFor = Symbol.for;
+  REACT_SERVER_BLOCK_TYPE = symbolFor("react.server.block");
+}
 exports.serverBlock = function(moduleReference, loadData) {
   return [REACT_SERVER_BLOCK_TYPE, moduleReference, loadData];
 };
