@@ -1957,6 +1957,7 @@ function resolveDefaultProps(Component, baseProps) {
     for (var propName in Component)
       void 0 === baseProps[propName] &&
         (baseProps[propName] = Component[propName]);
+    return baseProps;
   }
   return baseProps;
 }
