@@ -12,14 +12,14 @@
       "bundleType": "UMD_PROD",
       "packageName": "react",
       "size": 12746,
-      "gzip": 4960
+      "gzip": 4969
     },
     {
       "filename": "react.profiling.min.js",
       "bundleType": "UMD_PROFILING",
       "packageName": "react",
       "size": 16370,
-      "gzip": 6095
+      "gzip": 6092
     },
     {
       "filename": "react.development.js",
@@ -33,7 +33,7 @@
       "bundleType": "NODE_PROD",
       "packageName": "react",
       "size": 7634,
-      "gzip": 3002
+      "gzip": 2999
     },
     {
       "filename": "React-dev.js",
@@ -187,7 +187,7 @@
       "bundleType": "UMD_PROFILING",
       "packageName": "react-dom",
       "size": 133169,
-      "gzip": 42546
+      "gzip": 42543
     },
     {
       "filename": "react-dom.development.js",
@@ -313,7 +313,7 @@
       "bundleType": "UMD_PROD",
       "packageName": "react-dom",
       "size": 20786,
-      "gzip": 7680
+      "gzip": 7678
     },
     {
       "filename": "react-dom-server.browser.development.js",
@@ -544,7 +544,7 @@
       "bundleType": "UMD_PROD",
       "packageName": "react-art",
       "size": 114355,
-      "gzip": 34641
+      "gzip": 34643
     },
     {
       "filename": "react-art.development.js",
@@ -705,7 +705,7 @@
       "bundleType": "UMD_PROD",
       "packageName": "react-test-renderer",
       "size": 13029,
-      "gzip": 4048
+      "gzip": 4045
     },
     {
       "filename": "react-noop-renderer.development.js",
@@ -845,7 +845,7 @@
       "bundleType": "NODE_PROD",
       "packageName": "react-client",
       "size": 3165,
-      "gzip": 1473
+      "gzip": 1475
     },
     {
       "filename": "react-reconciler-reflection.development.js",
@@ -1062,7 +1062,7 @@
       "bundleType": "NODE_PROD",
       "packageName": "eslint-plugin-react-hooks",
       "size": 23416,
-      "gzip": 7872
+      "gzip": 7869
     },
     {
       "filename": "react-refresh-babel.development.js",
