@@ -56,26 +56,18 @@ function error(format) {
 
 function printWarning(level, format, args) {
   {
-    var hasExistingStack =
-      args.length > 0 &&
-      typeof args[args.length - 1] === "string" &&
-      args[args.length - 1].indexOf("\n    in") === 0;
+    var React = require("react");
 
-    if (!hasExistingStack) {
-      var React = require("react");
+    var ReactSharedInternals =
+      React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
 
-      var ReactSharedInternals =
-        React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
+    if (ReactSharedInternals != null) {
+      var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+      var stack = ReactDebugCurrentFrame.getStackAddendum();
 
-      if (ReactSharedInternals != null) {
-        var ReactDebugCurrentFrame =
-          ReactSharedInternals.ReactDebugCurrentFrame;
-        var stack = ReactDebugCurrentFrame.getStackAddendum();
-
-        if (stack !== "") {
-          format += "%s";
-          args.push(stack);
-        }
+      if (stack !== "") {
+        format += "%s";
+        args.push(stack);
       }
     } // TODO: don't ignore level and pass it down somewhere too.
 
@@ -101,6 +93,9 @@ function get(key) {
 var ReactSharedInternals =
   React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
 
+// ATTENTION
+// When adding new symbols to this file,
+// Please consider also adding to 'react-devtools-shared/src/backend/ReactSymbols'
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
 // nor polyfill, then a plain number is used for performance.
 var REACT_ELEMENT_TYPE = 0xeac7;
@@ -109,11 +104,7 @@ var REACT_FRAGMENT_TYPE = 0xeacb;
 var REACT_STRICT_MODE_TYPE = 0xeacc;
 var REACT_PROFILER_TYPE = 0xead2;
 var REACT_PROVIDER_TYPE = 0xeacd;
-var REACT_CONTEXT_TYPE = 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-// (unstable) APIs that have been removed. Can we remove the symbols?
-
-var REACT_ASYNC_MODE_TYPE = 0xeacf;
-var REACT_CONCURRENT_MODE_TYPE = 0xeacf;
+var REACT_CONTEXT_TYPE = 0xeace;
 var REACT_FORWARD_REF_TYPE = 0xead0;
 var REACT_SUSPENSE_TYPE = 0xead1;
 var REACT_SUSPENSE_LIST_TYPE = 0xead8;
@@ -124,6 +115,10 @@ var REACT_SERVER_BLOCK_TYPE = 0xeada;
 var REACT_FUNDAMENTAL_TYPE = 0xead5;
 var REACT_RESPONDER_TYPE = 0xead6;
 var REACT_SCOPE_TYPE = 0xead7;
+var REACT_OPAQUE_ID_TYPE = 0xeae0;
+var REACT_DEBUG_TRACING_MODE_TYPE = 0xeae1;
+var REACT_OFFSCREEN_TYPE = 0xeae2;
+var REACT_LEGACY_HIDDEN_TYPE = 0xeae3;
 
 if (typeof Symbol === "function" && Symbol.for) {
   var symbolFor = Symbol.for;
@@ -134,8 +129,6 @@ if (typeof Symbol === "function" && Symbol.for) {
   REACT_PROFILER_TYPE = symbolFor("react.profiler");
   REACT_PROVIDER_TYPE = symbolFor("react.provider");
   REACT_CONTEXT_TYPE = symbolFor("react.context");
-  REACT_ASYNC_MODE_TYPE = symbolFor("react.async_mode");
-  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
   REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
   REACT_SUSPENSE_TYPE = symbolFor("react.suspense");
   REACT_SUSPENSE_LIST_TYPE = symbolFor("react.suspense_list");
@@ -146,6 +139,10 @@ if (typeof Symbol === "function" && Symbol.for) {
   REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
   REACT_RESPONDER_TYPE = symbolFor("react.responder");
   REACT_SCOPE_TYPE = symbolFor("react.scope");
+  REACT_OPAQUE_ID_TYPE = symbolFor("react.opaque.id");
+  REACT_DEBUG_TRACING_MODE_TYPE = symbolFor("react.debug_trace_mode");
+  REACT_OFFSCREEN_TYPE = symbolFor("react.offscreen");
+  REACT_LEGACY_HIDDEN_TYPE = symbolFor("react.legacy_hidden");
 }
 
 var FunctionComponent = 0;
@@ -158,14 +155,14 @@ var HostText = 6;
 
 // Don't change these two values. They're used by React Dev Tools.
 var NoEffect =
-  /*              */
+  /*                 */
   0;
 
 var Placement =
-  /*             */
+  /*                */
   2;
 var Hydrating =
-  /*             */
+  /*                */
   1024;
 
 // Re-export dynamic flags from the www version.
@@ -177,14 +174,20 @@ var debugRenderPhaseSideEffectsForStrictMode =
     dynamicFeatureFlags.disableInputAttributeSyncing,
   enableTrustedTypesIntegration =
     dynamicFeatureFlags.enableTrustedTypesIntegration,
-  warnAboutShorthandPropertyCollision =
-    dynamicFeatureFlags.warnAboutShorthandPropertyCollision,
   disableSchedulerTimeoutBasedOnReactExpirationTime =
     dynamicFeatureFlags.disableSchedulerTimeoutBasedOnReactExpirationTime,
   warnAboutSpreadingKeyToJSX = dynamicFeatureFlags.warnAboutSpreadingKeyToJSX,
+  enableComponentStackLocations =
+    dynamicFeatureFlags.enableComponentStackLocations,
   replayFailedUnitOfWorkWithInvokeGuardedCallback =
     dynamicFeatureFlags.replayFailedUnitOfWorkWithInvokeGuardedCallback,
-  enableModernEventSystem = dynamicFeatureFlags.enableModernEventSystem; // On WWW, true is used for a new modern build.
+  enableModernEventSystem = dynamicFeatureFlags.enableModernEventSystem,
+  enableFilterEmptyStringAttributesDOM =
+    dynamicFeatureFlags.enableFilterEmptyStringAttributesDOM,
+  enableLegacyFBSupport = dynamicFeatureFlags.enableLegacyFBSupport,
+  enableDebugTracing = dynamicFeatureFlags.enableDebugTracing,
+  deferRenderPhaseUpdateToNextBatch =
+    dynamicFeatureFlags.deferRenderPhaseUpdateToNextBatch; // On WWW, true is used for a new modern build.
 
 var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
 function getNearestMountedFiber(fiber) {
@@ -468,8 +471,12 @@ function SyntheticEvent(
   this.dispatchConfig = dispatchConfig;
   this._targetInst = targetInst;
   this.nativeEvent = nativeEvent;
-  this._dispatchListeners = null;
-  this._dispatchInstances = null;
+
+  if (!enableModernEventSystem) {
+    this._dispatchListeners = null;
+    this._dispatchInstances = null;
+  }
+
   var Interface = this.constructor.Interface;
 
   for (var propName in Interface) {
@@ -553,7 +560,10 @@ Object.assign(SyntheticEvent.prototype, {
    * won't be added back into the pool.
    */
   persist: function() {
-    this.isPersistent = functionThatReturnsTrue;
+    // Modern event system doesn't use pooling.
+    if (!enableModernEventSystem) {
+      this.isPersistent = functionThatReturnsTrue;
+    }
   },
 
   /**
@@ -561,64 +571,69 @@ Object.assign(SyntheticEvent.prototype, {
    *
    * @return {boolean} True if this should not be released, false otherwise.
    */
-  isPersistent: functionThatReturnsFalse,
+  isPersistent: enableModernEventSystem
+    ? functionThatReturnsTrue
+    : functionThatReturnsFalse,
 
   /**
    * `PooledClass` looks for `destructor` on each instance it releases.
    */
   destructor: function() {
-    var Interface = this.constructor.Interface;
+    // Modern event system doesn't use pooling.
+    if (!enableModernEventSystem) {
+      var Interface = this.constructor.Interface;
 
-    for (var propName in Interface) {
+      for (var propName in Interface) {
+        {
+          Object.defineProperty(
+            this,
+            propName,
+            getPooledWarningPropertyDefinition(propName, Interface[propName])
+          );
+        }
+      }
+
+      this.dispatchConfig = null;
+      this._targetInst = null;
+      this.nativeEvent = null;
+      this.isDefaultPrevented = functionThatReturnsFalse;
+      this.isPropagationStopped = functionThatReturnsFalse;
+      this._dispatchListeners = null;
+      this._dispatchInstances = null;
+
       {
         Object.defineProperty(
           this,
-          propName,
-          getPooledWarningPropertyDefinition(propName, Interface[propName])
+          "nativeEvent",
+          getPooledWarningPropertyDefinition("nativeEvent", null)
+        );
+        Object.defineProperty(
+          this,
+          "isDefaultPrevented",
+          getPooledWarningPropertyDefinition(
+            "isDefaultPrevented",
+            functionThatReturnsFalse
+          )
+        );
+        Object.defineProperty(
+          this,
+          "isPropagationStopped",
+          getPooledWarningPropertyDefinition(
+            "isPropagationStopped",
+            functionThatReturnsFalse
+          )
+        );
+        Object.defineProperty(
+          this,
+          "preventDefault",
+          getPooledWarningPropertyDefinition("preventDefault", function() {})
+        );
+        Object.defineProperty(
+          this,
+          "stopPropagation",
+          getPooledWarningPropertyDefinition("stopPropagation", function() {})
         );
       }
-    }
-
-    this.dispatchConfig = null;
-    this._targetInst = null;
-    this.nativeEvent = null;
-    this.isDefaultPrevented = functionThatReturnsFalse;
-    this.isPropagationStopped = functionThatReturnsFalse;
-    this._dispatchListeners = null;
-    this._dispatchInstances = null;
-
-    {
-      Object.defineProperty(
-        this,
-        "nativeEvent",
-        getPooledWarningPropertyDefinition("nativeEvent", null)
-      );
-      Object.defineProperty(
-        this,
-        "isDefaultPrevented",
-        getPooledWarningPropertyDefinition(
-          "isDefaultPrevented",
-          functionThatReturnsFalse
-        )
-      );
-      Object.defineProperty(
-        this,
-        "isPropagationStopped",
-        getPooledWarningPropertyDefinition(
-          "isPropagationStopped",
-          functionThatReturnsFalse
-        )
-      );
-      Object.defineProperty(
-        this,
-        "preventDefault",
-        getPooledWarningPropertyDefinition("preventDefault", function() {})
-      );
-      Object.defineProperty(
-        this,
-        "stopPropagation",
-        getPooledWarningPropertyDefinition("stopPropagation", function() {})
-      );
     }
   }
 });
@@ -695,19 +710,26 @@ function getPooledWarningPropertyDefinition(propName, getVal) {
   }
 }
 
-function getPooledEvent(dispatchConfig, targetInst, nativeEvent, nativeInst) {
-  var EventConstructor = this;
+function createOrGetPooledEvent(
+  dispatchConfig,
+  targetInst,
+  nativeEvent,
+  nativeInst
+) {
+  var EventConstructor = this; // Modern event system doesn't use pooling.
 
-  if (EventConstructor.eventPool.length) {
-    var instance = EventConstructor.eventPool.pop();
-    EventConstructor.call(
-      instance,
-      dispatchConfig,
-      targetInst,
-      nativeEvent,
-      nativeInst
-    );
-    return instance;
+  if (!enableModernEventSystem) {
+    if (EventConstructor.eventPool.length) {
+      var instance = EventConstructor.eventPool.pop();
+      EventConstructor.call(
+        instance,
+        dispatchConfig,
+        targetInst,
+        nativeEvent,
+        nativeInst
+      );
+      return instance;
+    }
   }
 
   return new EventConstructor(
@@ -719,27 +741,33 @@ function getPooledEvent(dispatchConfig, targetInst, nativeEvent, nativeInst) {
 }
 
 function releasePooledEvent(event) {
-  var EventConstructor = this;
+  // Modern event system doesn't use pooling.
+  if (!enableModernEventSystem) {
+    var EventConstructor = this;
 
-  if (!(event instanceof EventConstructor)) {
-    {
-      throw Error(
-        "Trying to release an event instance into a pool of a different type."
-      );
+    if (!(event instanceof EventConstructor)) {
+      {
+        throw Error(
+          "Trying to release an event instance into a pool of a different type."
+        );
+      }
     }
-  }
 
-  event.destructor();
+    event.destructor();
 
-  if (EventConstructor.eventPool.length < EVENT_POOL_SIZE) {
-    EventConstructor.eventPool.push(event);
+    if (EventConstructor.eventPool.length < EVENT_POOL_SIZE) {
+      EventConstructor.eventPool.push(event);
+    }
   }
 }
 
 function addEventPoolingTo(EventConstructor) {
-  EventConstructor.eventPool = [];
-  EventConstructor.getPooled = getPooledEvent;
-  EventConstructor.release = releasePooledEvent;
+  EventConstructor.getPooled = createOrGetPooledEvent; // Modern event system doesn't use pooling.
+
+  if (!enableModernEventSystem) {
+    EventConstructor.eventPool = [];
+    EventConstructor.release = releasePooledEvent;
+  }
 }
 
 /**
@@ -929,8 +957,6 @@ var TOP_VOLUME_CHANGE = unsafeCastStringToDOMTopLevelType("volumechange");
 var TOP_WAITING = unsafeCastStringToDOMTopLevelType("waiting");
 var TOP_WHEEL = unsafeCastStringToDOMTopLevelType("wheel");
 
-var PLUGIN_EVENT_SYSTEM = 1;
-
 var didWarnAboutMessageChannel = false;
 var enqueueTaskImpl = null;
 function enqueueTask(task) {
@@ -942,7 +968,7 @@ function enqueueTask(task) {
       var nodeRequire = module && module[requireString]; // assuming we're in node, let's try to get node's
       // version of setImmediate, bypassing fake timers if any.
 
-      enqueueTaskImpl = nodeRequire("timers").setImmediate;
+      enqueueTaskImpl = nodeRequire.call(module, "timers").setImmediate;
     } catch (_err) {
       // we're in a browser
       // we can't use regular timers because they may still be faked
@@ -973,8 +999,6 @@ function enqueueTask(task) {
   return enqueueTaskImpl(task);
 }
 
-// ReactDOM.js, and ReactTestUtils.js:
-
 var _ReactDOM$__SECRET_IN =
     ReactDOM.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.Events,
   /* eslint-disable no-unused-vars */
@@ -986,10 +1010,9 @@ var _ReactDOM$__SECRET_IN =
   enqueueStateRestore = _ReactDOM$__SECRET_IN[5],
   restoreStateIfNeeded = _ReactDOM$__SECRET_IN[6],
   dispatchEvent = _ReactDOM$__SECRET_IN[7],
-  runEventsInBatch = _ReactDOM$__SECRET_IN[8],
   /* eslint-enable no-unused-vars */
-  flushPassiveEffects = _ReactDOM$__SECRET_IN[9],
-  IsThisRendererActing = _ReactDOM$__SECRET_IN[10];
+  flushPassiveEffects = _ReactDOM$__SECRET_IN[8],
+  IsThisRendererActing = _ReactDOM$__SECRET_IN[9];
 var batchedUpdates = ReactDOM.unstable_batchedUpdates;
 var IsSomeRendererActing = ReactSharedInternals.IsSomeRendererActing; // this implementation should be exactly the same in
 // ReactTestUtilsAct.js, ReactTestRendererAct.js, createReactNoop.js
@@ -1225,46 +1248,125 @@ function accumulateInto(current, next) {
   return [current, next];
 }
 
-function getParent(inst) {
-  do {
-    inst = inst.return; // TODO: If this is a HostRoot we might want to bail out.
-    // That is depending on if we want nested subtrees (layers) to bubble
-    // events to their parent. We could also go through parentNode on the
-    // host node but that wouldn't work for React Native and doesn't let us
-    // do the portal feature.
-  } while (inst && inst.tag !== HostComponent);
+var ReactFbErrorUtils = require("ReactFbErrorUtils");
 
-  if (inst) {
-    return inst;
+if (!(typeof ReactFbErrorUtils.invokeGuardedCallback === "function")) {
+  {
+    throw Error(
+      "Expected ReactFbErrorUtils.invokeGuardedCallback to be a function."
+    );
   }
-
-  return null;
 }
+
+var invokeGuardedCallbackImpl = function(
+  name,
+  func,
+  context,
+  a,
+  b,
+  c,
+  d,
+  e,
+  f
+) {
+  // This will call `this.onError(err)` if an error was caught.
+  ReactFbErrorUtils.invokeGuardedCallback.apply(this, arguments);
+};
+
+var hasError = false;
+var caughtError = null; // Used by event system to capture/rethrow the first error.
+
+var hasRethrowError = false;
+var rethrowError = null;
+var reporter = {
+  onError: function(error) {
+    hasError = true;
+    caughtError = error;
+  }
+};
 /**
- * Simulates the traversal of a two-phase, capture/bubble event dispatch.
+ * Call a function while guarding against errors that happens within it.
+ * Returns an error if it throws, otherwise null.
+ *
+ * In production, this is implemented using a try-catch. The reason we don't
+ * use a try-catch directly is so that we can swap out a different
+ * implementation in DEV mode.
+ *
+ * @param {String} name of the guard to use for logging or debugging
+ * @param {Function} func The function to invoke
+ * @param {*} context The context to use when calling the function
+ * @param {...*} args Arguments for function
  */
 
-function traverseTwoPhase(inst, fn, arg) {
-  var path = [];
+function invokeGuardedCallback(name, func, context, a, b, c, d, e, f) {
+  hasError = false;
+  caughtError = null;
+  invokeGuardedCallbackImpl.apply(reporter, arguments);
+}
+/**
+ * Same as invokeGuardedCallback, but instead of returning an error, it stores
+ * it in a global so it can be rethrown by `rethrowCaughtError` later.
+ * TODO: See if caughtError and rethrowError can be unified.
+ *
+ * @param {String} name of the guard to use for logging or debugging
+ * @param {Function} func The function to invoke
+ * @param {*} context The context to use when calling the function
+ * @param {...*} args Arguments for function
+ */
 
-  while (inst) {
-    path.push(inst);
-    inst = getParent(inst);
+function invokeGuardedCallbackAndCatchFirstError(
+  name,
+  func,
+  context,
+  a,
+  b,
+  c,
+  d,
+  e,
+  f
+) {
+  invokeGuardedCallback.apply(this, arguments);
+
+  if (hasError) {
+    var error = clearCaughtError();
+
+    if (!hasRethrowError) {
+      hasRethrowError = true;
+      rethrowError = error;
+    }
   }
+}
+/**
+ * During execution of guarded functions we will capture the first error which
+ * we will rethrow to be handled by the top level error handler.
+ */
 
-  var i;
-
-  for (i = path.length; i-- > 0; ) {
-    fn(path[i], "captured", arg);
+function rethrowCaughtError() {
+  if (hasRethrowError) {
+    var error = rethrowError;
+    hasRethrowError = false;
+    rethrowError = null;
+    throw error;
   }
-
-  for (i = 0; i < path.length; i++) {
-    fn(path[i], "bubbled", arg);
+}
+function clearCaughtError() {
+  if (hasError) {
+    var error = caughtError;
+    hasError = false;
+    caughtError = null;
+    return error;
+  } else {
+    {
+      {
+        throw Error(
+          "clearCaughtError was called but no error was captured. This error is likely caused by a bug in React. Please file an issue."
+        );
+      }
+    }
   }
 }
 
-var findDOMNode = ReactDOM.findDOMNode; // Keep in sync with ReactDOMUnstableNativeDependencies.js
-// ReactDOM.js, and ReactTestUtilsAct.js:
+var findDOMNode = ReactDOM.findDOMNode; // Keep in sync with ReactDOM.js, and ReactTestUtilsAct.js:
 
 var _ReactDOM$__SECRET_IN$1 =
     ReactDOM.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.Events,
@@ -1278,47 +1380,19 @@ var _ReactDOM$__SECRET_IN$1 =
   enqueueStateRestore$1 = _ReactDOM$__SECRET_IN$1[5],
   restoreStateIfNeeded$1 = _ReactDOM$__SECRET_IN$1[6],
   dispatchEvent$1 = _ReactDOM$__SECRET_IN$1[7],
-  runEventsInBatch$1 = _ReactDOM$__SECRET_IN$1[8],
   /* eslint-disable no-unused-vars */
-  flushPassiveEffects$1 = _ReactDOM$__SECRET_IN$1[9],
+  flushPassiveEffects$1 = _ReactDOM$__SECRET_IN$1[8],
   IsThisRendererActing$1 =
     /* eslint-enable no-unused-vars */
-    _ReactDOM$__SECRET_IN$1[10];
+    _ReactDOM$__SECRET_IN$1[9];
 
 function Event(suffix) {}
 
 var hasWarnedAboutDeprecatedMockComponent = false;
+var didWarnSimulateNativeDeprecated = false;
 /**
  * @class ReactTestUtils
  */
-
-/**
- * Simulates a top level event being dispatched from a raw event that occurred
- * on an `Element` node.
- * @param {number} topLevelType A number from `TopLevelEventTypes`
- * @param {!Element} node The dom to simulate an event occurring on.
- * @param {?Event} fakeNativeEvent Fake native event to use in SyntheticEvent.
- */
-
-function simulateNativeEventOnNode(topLevelType, node, fakeNativeEvent) {
-  fakeNativeEvent.target = node;
-  dispatchEvent$1(topLevelType, PLUGIN_EVENT_SYSTEM, null, fakeNativeEvent);
-}
-/**
- * Simulates a top level event being dispatched from a raw event that occurred
- * on the `ReactDOMComponent` `comp`.
- * @param {Object} topLevelType A type from `BrowserEventConstants.topLevelTypes`.
- * @param {!ReactDOMComponent} comp
- * @param {?Event} fakeNativeEvent Fake native event to use in SyntheticEvent.
- */
-
-function simulateNativeEventOnDOMComponent(
-  topLevelType,
-  comp,
-  fakeNativeEvent
-) {
-  simulateNativeEventOnNode(topLevelType, findDOMNode(comp), fakeNativeEvent);
-}
 
 function findAllInRenderedFiberTreeInternal(fiber, test) {
   if (!fiber) {
@@ -1657,6 +1731,95 @@ function nativeTouchData(x, y) {
 // EventPropagator.js, as they deviated from ReactDOM's newer
 // implementations.
 
+/**
+ * Dispatch the event to the listener.
+ * @param {SyntheticEvent} event SyntheticEvent to handle
+ * @param {function} listener Application-level callback
+ * @param {*} inst Internal component instance
+ */
+
+function executeDispatch(event, listener, inst) {
+  var type = event.type || "unknown-event";
+  event.currentTarget = getNodeFromInstance$1(inst);
+  invokeGuardedCallbackAndCatchFirstError(type, listener, undefined, event);
+  event.currentTarget = null;
+}
+/**
+ * Standard/simple iteration through an event's collected dispatches.
+ */
+
+function executeDispatchesInOrder(event) {
+  var dispatchListeners = event._dispatchListeners;
+  var dispatchInstances = event._dispatchInstances;
+
+  if (Array.isArray(dispatchListeners)) {
+    for (var i = 0; i < dispatchListeners.length; i++) {
+      if (event.isPropagationStopped()) {
+        break;
+      } // Listeners and Instances are two parallel arrays that are always in sync.
+
+      executeDispatch(event, dispatchListeners[i], dispatchInstances[i]);
+    }
+  } else if (dispatchListeners) {
+    executeDispatch(event, dispatchListeners, dispatchInstances);
+  }
+
+  event._dispatchListeners = null;
+  event._dispatchInstances = null;
+}
+/**
+ * Internal queue of events that have accumulated their dispatches and are
+ * waiting to have their dispatches executed.
+ */
+
+var eventQueue = null;
+/**
+ * Dispatches an event and releases it back into the pool, unless persistent.
+ *
+ * @param {?object} event Synthetic event to be dispatched.
+ * @private
+ */
+
+var executeDispatchesAndRelease = function(event) {
+  if (event) {
+    executeDispatchesInOrder(event);
+
+    if (!event.isPersistent()) {
+      event.constructor.release(event);
+    }
+  }
+};
+
+var executeDispatchesAndReleaseTopLevel = function(e) {
+  return executeDispatchesAndRelease(e);
+};
+
+function runEventsInBatch(events) {
+  if (events !== null) {
+    eventQueue = accumulateInto(eventQueue, events);
+  } // Set `eventQueue` to null before processing it so that we can tell if more
+  // events get enqueued while processing.
+
+  var processingEventQueue = eventQueue;
+  eventQueue = null;
+
+  if (!processingEventQueue) {
+    return;
+  }
+
+  forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
+
+  if (!!eventQueue) {
+    {
+      throw Error(
+        "processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented."
+      );
+    }
+  } // This would be a good time to rethrow if any of the event handlers threw.
+
+  rethrowCaughtError();
+}
+
 function isInteractive(tag) {
   return (
     tag === "button" ||
@@ -1664,6 +1827,44 @@ function isInteractive(tag) {
     tag === "select" ||
     tag === "textarea"
   );
+}
+
+function getParent(inst) {
+  do {
+    inst = inst.return; // TODO: If this is a HostRoot we might want to bail out.
+    // That is depending on if we want nested subtrees (layers) to bubble
+    // events to their parent. We could also go through parentNode on the
+    // host node but that wouldn't work for React Native and doesn't let us
+    // do the portal feature.
+  } while (inst && inst.tag !== HostComponent);
+
+  if (inst) {
+    return inst;
+  }
+
+  return null;
+}
+/**
+ * Simulates the traversal of a two-phase, capture/bubble event dispatch.
+ */
+
+function traverseTwoPhase(inst, fn, arg) {
+  var path = [];
+
+  while (inst) {
+    path.push(inst);
+    inst = getParent(inst);
+  }
+
+  var i;
+
+  for (i = path.length; i-- > 0; ) {
+    fn(path[i], "captured", arg);
+  }
+
+  for (i = 0; i < path.length; i++) {
+    fn(path[i], "bubbled", arg);
+  }
 }
 
 function shouldPreventMouseEvent(name, type, props) {
@@ -1789,7 +1990,7 @@ function accumulateTwoPhaseDispatches(events) {
 } // End of inline
 
 var Simulate = {};
-var SimulateNative = {};
+
 /**
  * Exports:
  *
@@ -1845,7 +2046,7 @@ function makeSimulator(eventType) {
       // Normally extractEvent enqueues a state restore, but we'll just always
       // do that since we're by-passing it here.
       enqueueStateRestore$1(domNode);
-      runEventsInBatch$1(event);
+      runEventsInBatch(event);
     });
     restoreStateIfNeeded$1();
   };
@@ -1864,127 +2065,180 @@ function buildSimulators() {
 }
 
 buildSimulators();
-/**
- * Exports:
- *
- * - `SimulateNative.click(Element/ReactDOMComponent)`
- * - `SimulateNative.mouseMove(Element/ReactDOMComponent)`
- * - `SimulateNative.mouseIn/ReactDOMComponent)`
- * - `SimulateNative.mouseOut(Element/ReactDOMComponent)`
- * - ... (All keys from `BrowserEventConstants.topLevelTypes`)
- *
- * Note: Top level event types are a subset of the entire set of handler types
- * (which include a broader set of "synthetic" events). For example, onDragDone
- * is a synthetic event. Except when testing an event plugin or React's event
- * handling code specifically, you probably want to use Simulate
- * to dispatch synthetic events.
- */
 
-function makeNativeSimulator(eventType, topLevelType) {
-  return function(domComponentOrNode, nativeEventData) {
-    var fakeNativeEvent = new Event(eventType);
-    Object.assign(fakeNativeEvent, nativeEventData);
+if (!enableModernEventSystem) {
+  exports.SimulateNative = {};
+  /**
+   * Simulates a top level event being dispatched from a raw event that occurred
+   * on an `Element` node.
+   * @param {number} topLevelType A number from `TopLevelEventTypes`
+   * @param {!Element} node The dom to simulate an event occurring on.
+   * @param {?Event} fakeNativeEvent Fake native event to use in SyntheticEvent.
+   */
 
-    if (isDOMComponent(domComponentOrNode)) {
-      simulateNativeEventOnDOMComponent(
-        topLevelType,
-        domComponentOrNode,
-        fakeNativeEvent
-      );
-    } else if (domComponentOrNode.tagName) {
-      // Will allow on actual dom nodes.
-      simulateNativeEventOnNode(
-        topLevelType,
-        domComponentOrNode,
-        fakeNativeEvent
-      );
-    }
+  var simulateNativeEventOnNode = function(
+    topLevelType,
+    node,
+    fakeNativeEvent
+  ) {
+    fakeNativeEvent.target = node;
+    var PLUGIN_EVENT_SYSTEM = 1;
+    dispatchEvent$1(topLevelType, PLUGIN_EVENT_SYSTEM, null, fakeNativeEvent);
   };
+  /**
+   * Simulates a top level event being dispatched from a raw event that occurred
+   * on the `ReactDOMComponent` `comp`.
+   * @param {Object} topLevelType A type from `BrowserEventConstants.topLevelTypes`.
+   * @param {!ReactDOMComponent} comp
+   * @param {?Event} fakeNativeEvent Fake native event to use in SyntheticEvent.
+   */
+
+  var simulateNativeEventOnDOMComponent = function(
+    topLevelType,
+    comp,
+    fakeNativeEvent
+  ) {
+    simulateNativeEventOnNode(topLevelType, findDOMNode(comp), fakeNativeEvent);
+  };
+  /**
+   * Exports:
+   *
+   * - `SimulateNative.click(Element/ReactDOMComponent)`
+   * - `SimulateNative.mouseMove(Element/ReactDOMComponent)`
+   * - `SimulateNative.mouseIn/ReactDOMComponent)`
+   * - `SimulateNative.mouseOut(Element/ReactDOMComponent)`
+   * - ... (All keys from `BrowserEventConstants.topLevelTypes`)
+   *
+   * Note: Top level event types are a subset of the entire set of handler types
+   * (which include a broader set of "synthetic" events). For example, onDragDone
+   * is a synthetic event. Except when testing an event plugin or React's event
+   * handling code specifically, you probably want to use Simulate
+   * to dispatch synthetic events.
+   */
+
+  var makeNativeSimulator = function(eventType, topLevelType) {
+    return function(domComponentOrNode, nativeEventData) {
+      {
+        if (!didWarnSimulateNativeDeprecated) {
+          didWarnSimulateNativeDeprecated = true;
+
+          warn(
+            "ReactTestUtils.SimulateNative is an undocumented API that does not match " +
+              "how the browser dispatches events, and will be removed in a future major " +
+              "version of React. If you rely on it for testing, consider attaching the root " +
+              "DOM container to the document during the test, and then dispatching native browser " +
+              "events by calling `node.dispatchEvent()` on the DOM nodes. Make sure to set " +
+              "the `bubbles` flag to `true` when creating the native browser event."
+          );
+        }
+      }
+
+      var fakeNativeEvent = new Event(eventType);
+      Object.assign(fakeNativeEvent, nativeEventData);
+
+      if (isDOMComponent(domComponentOrNode)) {
+        simulateNativeEventOnDOMComponent(
+          topLevelType,
+          domComponentOrNode,
+          fakeNativeEvent
+        );
+      } else if (domComponentOrNode.tagName) {
+        // Will allow on actual dom nodes.
+        simulateNativeEventOnNode(
+          topLevelType,
+          domComponentOrNode,
+          fakeNativeEvent
+        );
+      }
+    };
+  };
+
+  [
+    [TOP_ABORT, "abort"],
+    [TOP_ANIMATION_END, "animationEnd"],
+    [TOP_ANIMATION_ITERATION, "animationIteration"],
+    [TOP_ANIMATION_START, "animationStart"],
+    [TOP_BLUR, "blur"],
+    [TOP_CAN_PLAY_THROUGH, "canPlayThrough"],
+    [TOP_CAN_PLAY, "canPlay"],
+    [TOP_CANCEL, "cancel"],
+    [TOP_CHANGE, "change"],
+    [TOP_CLICK, "click"],
+    [TOP_CLOSE, "close"],
+    [TOP_COMPOSITION_END, "compositionEnd"],
+    [TOP_COMPOSITION_START, "compositionStart"],
+    [TOP_COMPOSITION_UPDATE, "compositionUpdate"],
+    [TOP_CONTEXT_MENU, "contextMenu"],
+    [TOP_COPY, "copy"],
+    [TOP_CUT, "cut"],
+    [TOP_DOUBLE_CLICK, "doubleClick"],
+    [TOP_DRAG_END, "dragEnd"],
+    [TOP_DRAG_ENTER, "dragEnter"],
+    [TOP_DRAG_EXIT, "dragExit"],
+    [TOP_DRAG_LEAVE, "dragLeave"],
+    [TOP_DRAG_OVER, "dragOver"],
+    [TOP_DRAG_START, "dragStart"],
+    [TOP_DRAG, "drag"],
+    [TOP_DROP, "drop"],
+    [TOP_DURATION_CHANGE, "durationChange"],
+    [TOP_EMPTIED, "emptied"],
+    [TOP_ENCRYPTED, "encrypted"],
+    [TOP_ENDED, "ended"],
+    [TOP_ERROR, "error"],
+    [TOP_FOCUS, "focus"],
+    [TOP_INPUT, "input"],
+    [TOP_KEY_DOWN, "keyDown"],
+    [TOP_KEY_PRESS, "keyPress"],
+    [TOP_KEY_UP, "keyUp"],
+    [TOP_LOAD_START, "loadStart"],
+    [TOP_LOAD_START, "loadStart"],
+    [TOP_LOAD, "load"],
+    [TOP_LOADED_DATA, "loadedData"],
+    [TOP_LOADED_METADATA, "loadedMetadata"],
+    [TOP_MOUSE_DOWN, "mouseDown"],
+    [TOP_MOUSE_MOVE, "mouseMove"],
+    [TOP_MOUSE_OUT, "mouseOut"],
+    [TOP_MOUSE_OVER, "mouseOver"],
+    [TOP_MOUSE_UP, "mouseUp"],
+    [TOP_PASTE, "paste"],
+    [TOP_PAUSE, "pause"],
+    [TOP_PLAY, "play"],
+    [TOP_PLAYING, "playing"],
+    [TOP_PROGRESS, "progress"],
+    [TOP_RATE_CHANGE, "rateChange"],
+    [TOP_SCROLL, "scroll"],
+    [TOP_SEEKED, "seeked"],
+    [TOP_SEEKING, "seeking"],
+    [TOP_SELECTION_CHANGE, "selectionChange"],
+    [TOP_STALLED, "stalled"],
+    [TOP_SUSPEND, "suspend"],
+    [TOP_TEXT_INPUT, "textInput"],
+    [TOP_TIME_UPDATE, "timeUpdate"],
+    [TOP_TOGGLE, "toggle"],
+    [TOP_TOUCH_CANCEL, "touchCancel"],
+    [TOP_TOUCH_END, "touchEnd"],
+    [TOP_TOUCH_MOVE, "touchMove"],
+    [TOP_TOUCH_START, "touchStart"],
+    [TOP_TRANSITION_END, "transitionEnd"],
+    [TOP_VOLUME_CHANGE, "volumeChange"],
+    [TOP_WAITING, "waiting"],
+    [TOP_WHEEL, "wheel"]
+  ].forEach(function(_ref) {
+    var topLevelType = _ref[0],
+      eventType = _ref[1];
+
+    /**
+     * @param {!Element|ReactDOMComponent} domComponentOrNode
+     * @param {?Event} nativeEventData Fake native event to use in SyntheticEvent.
+     */
+    exports.SimulateNative[eventType] = makeNativeSimulator(
+      eventType,
+      topLevelType
+    );
+  });
 }
 
-[
-  [TOP_ABORT, "abort"],
-  [TOP_ANIMATION_END, "animationEnd"],
-  [TOP_ANIMATION_ITERATION, "animationIteration"],
-  [TOP_ANIMATION_START, "animationStart"],
-  [TOP_BLUR, "blur"],
-  [TOP_CAN_PLAY_THROUGH, "canPlayThrough"],
-  [TOP_CAN_PLAY, "canPlay"],
-  [TOP_CANCEL, "cancel"],
-  [TOP_CHANGE, "change"],
-  [TOP_CLICK, "click"],
-  [TOP_CLOSE, "close"],
-  [TOP_COMPOSITION_END, "compositionEnd"],
-  [TOP_COMPOSITION_START, "compositionStart"],
-  [TOP_COMPOSITION_UPDATE, "compositionUpdate"],
-  [TOP_CONTEXT_MENU, "contextMenu"],
-  [TOP_COPY, "copy"],
-  [TOP_CUT, "cut"],
-  [TOP_DOUBLE_CLICK, "doubleClick"],
-  [TOP_DRAG_END, "dragEnd"],
-  [TOP_DRAG_ENTER, "dragEnter"],
-  [TOP_DRAG_EXIT, "dragExit"],
-  [TOP_DRAG_LEAVE, "dragLeave"],
-  [TOP_DRAG_OVER, "dragOver"],
-  [TOP_DRAG_START, "dragStart"],
-  [TOP_DRAG, "drag"],
-  [TOP_DROP, "drop"],
-  [TOP_DURATION_CHANGE, "durationChange"],
-  [TOP_EMPTIED, "emptied"],
-  [TOP_ENCRYPTED, "encrypted"],
-  [TOP_ENDED, "ended"],
-  [TOP_ERROR, "error"],
-  [TOP_FOCUS, "focus"],
-  [TOP_INPUT, "input"],
-  [TOP_KEY_DOWN, "keyDown"],
-  [TOP_KEY_PRESS, "keyPress"],
-  [TOP_KEY_UP, "keyUp"],
-  [TOP_LOAD_START, "loadStart"],
-  [TOP_LOAD_START, "loadStart"],
-  [TOP_LOAD, "load"],
-  [TOP_LOADED_DATA, "loadedData"],
-  [TOP_LOADED_METADATA, "loadedMetadata"],
-  [TOP_MOUSE_DOWN, "mouseDown"],
-  [TOP_MOUSE_MOVE, "mouseMove"],
-  [TOP_MOUSE_OUT, "mouseOut"],
-  [TOP_MOUSE_OVER, "mouseOver"],
-  [TOP_MOUSE_UP, "mouseUp"],
-  [TOP_PASTE, "paste"],
-  [TOP_PAUSE, "pause"],
-  [TOP_PLAY, "play"],
-  [TOP_PLAYING, "playing"],
-  [TOP_PROGRESS, "progress"],
-  [TOP_RATE_CHANGE, "rateChange"],
-  [TOP_SCROLL, "scroll"],
-  [TOP_SEEKED, "seeked"],
-  [TOP_SEEKING, "seeking"],
-  [TOP_SELECTION_CHANGE, "selectionChange"],
-  [TOP_STALLED, "stalled"],
-  [TOP_SUSPEND, "suspend"],
-  [TOP_TEXT_INPUT, "textInput"],
-  [TOP_TIME_UPDATE, "timeUpdate"],
-  [TOP_TOGGLE, "toggle"],
-  [TOP_TOUCH_CANCEL, "touchCancel"],
-  [TOP_TOUCH_END, "touchEnd"],
-  [TOP_TOUCH_MOVE, "touchMove"],
-  [TOP_TOUCH_START, "touchStart"],
-  [TOP_TRANSITION_END, "transitionEnd"],
-  [TOP_VOLUME_CHANGE, "volumeChange"],
-  [TOP_WAITING, "waiting"],
-  [TOP_WHEEL, "wheel"]
-].forEach(function(_ref) {
-  var topLevelType = _ref[0],
-    eventType = _ref[1];
-
-  /**
-   * @param {!Element|ReactDOMComponent} domComponentOrNode
-   * @param {?Event} nativeEventData Fake native event to use in SyntheticEvent.
-   */
-  SimulateNative[eventType] = makeNativeSimulator(eventType, topLevelType);
-});
-
 exports.Simulate = Simulate;
-exports.SimulateNative = SimulateNative;
 exports.act = act;
 exports.findAllInRenderedTree = findAllInRenderedTree;
 exports.findRenderedComponentWithType = findRenderedComponentWithType;
@@ -2002,6 +2256,7 @@ exports.renderIntoDocument = renderIntoDocument;
 exports.scryRenderedComponentsWithType = scryRenderedComponentsWithType;
 exports.scryRenderedDOMComponentsWithClass = scryRenderedDOMComponentsWithClass;
 exports.scryRenderedDOMComponentsWithTag = scryRenderedDOMComponentsWithTag;
+exports.traverseTwoPhase = traverseTwoPhase;
 
   })();
 }

@@ -34,7 +34,6 @@ var REACT_PORTAL_TYPE = 60106,
   REACT_PROFILER_TYPE = 60114,
   REACT_PROVIDER_TYPE = 60109,
   REACT_CONTEXT_TYPE = 60110,
-  REACT_CONCURRENT_MODE_TYPE = 60111,
   REACT_FORWARD_REF_TYPE = 60112,
   REACT_SUSPENSE_TYPE = 60113,
   REACT_SUSPENSE_LIST_TYPE = 60120,
@@ -42,7 +41,9 @@ var REACT_PORTAL_TYPE = 60106,
   REACT_LAZY_TYPE = 60116,
   REACT_BLOCK_TYPE = 60121,
   REACT_FUNDAMENTAL_TYPE = 60117,
-  REACT_SCOPE_TYPE = 60119;
+  REACT_SCOPE_TYPE = 60119,
+  REACT_DEBUG_TRACING_MODE_TYPE = 60129,
+  REACT_LEGACY_HIDDEN_TYPE = 60131;
 if ("function" === typeof Symbol && Symbol.for) {
   var symbolFor = Symbol.for;
   REACT_PORTAL_TYPE = symbolFor("react.portal");
@@ -51,7 +52,6 @@ if ("function" === typeof Symbol && Symbol.for) {
   REACT_PROFILER_TYPE = symbolFor("react.profiler");
   REACT_PROVIDER_TYPE = symbolFor("react.provider");
   REACT_CONTEXT_TYPE = symbolFor("react.context");
-  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
   REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
   REACT_SUSPENSE_TYPE = symbolFor("react.suspense");
   REACT_SUSPENSE_LIST_TYPE = symbolFor("react.suspense_list");
@@ -60,6 +60,8 @@ if ("function" === typeof Symbol && Symbol.for) {
   REACT_BLOCK_TYPE = symbolFor("react.block");
   REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
   REACT_SCOPE_TYPE = symbolFor("react.scope");
+  REACT_DEBUG_TRACING_MODE_TYPE = symbolFor("react.debug_trace_mode");
+  REACT_LEGACY_HIDDEN_TYPE = symbolFor("react.legacy_hidden");
 }
 function getComponentName(type) {
   if (null == type) return null;
@@ -105,10 +107,11 @@ function getComponentName(type) {
     }
   return null;
 }
-var ReactSharedInternals =
-  React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-require("ReactFeatureFlags");
-var emptyObject = {};
+var enableFilterEmptyStringAttributesDOM = require("ReactFeatureFlags")
+    .enableFilterEmptyStringAttributesDOM,
+  ReactSharedInternals =
+    React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED,
+  emptyObject = {};
 function validateContextBounds(context, threadID) {
   for (var i = context._threadCount | 0; i <= threadID; i++)
     (context[i] = context._currentValue2), (context._threadCount = i + 1);
@@ -176,7 +179,13 @@ function shouldRemoveAttribute(
   )
     return !0;
   if (isCustomComponentTag) return !1;
-  if (null !== propertyInfo)
+  if (null !== propertyInfo) {
+    if (
+      enableFilterEmptyStringAttributesDOM &&
+      propertyInfo.removeEmptyString &&
+      "" === value
+    )
+      return !0;
     switch (propertyInfo.type) {
       case 3:
         return !value;
@@ -187,6 +196,7 @@ function shouldRemoveAttribute(
       case 6:
         return isNaN(value) || 1 > value;
     }
+  }
   return !1;
 }
 function PropertyInfoRecord(
@@ -195,7 +205,8 @@ function PropertyInfoRecord(
   mustUseProperty,
   attributeName,
   attributeNamespace,
-  sanitizeURL
+  sanitizeURL,
+  removeEmptyString
 ) {
   this.acceptsBooleans = 2 === type || 3 === type || 4 === type;
   this.attributeName = attributeName;
@@ -204,6 +215,7 @@ function PropertyInfoRecord(
   this.propertyName = name;
   this.type = type;
   this.sanitizeURL = sanitizeURL;
+  this.removeEmptyString = removeEmptyString;
 }
 var properties = {},
   reservedProps = "children dangerouslySetInnerHTML defaultValue defaultChecked innerHTML suppressContentEditableWarning suppressHydrationWarning style".split(
@@ -211,7 +223,7 @@ var properties = {},
   );
 reservedProps.push("DEPRECATED_flareListeners");
 reservedProps.forEach(function(name) {
-  properties[name] = new PropertyInfoRecord(name, 0, !1, name, null, !1);
+  properties[name] = new PropertyInfoRecord(name, 0, !1, name, null, !1, !1);
 });
 [
   ["acceptCharset", "accept-charset"],
@@ -220,7 +232,7 @@ reservedProps.forEach(function(name) {
   ["httpEquiv", "http-equiv"]
 ].forEach(function(_ref) {
   var name = _ref[0];
-  properties[name] = new PropertyInfoRecord(name, 1, !1, _ref[1], null, !1);
+  properties[name] = new PropertyInfoRecord(name, 1, !1, _ref[1], null, !1, !1);
 });
 ["contentEditable", "draggable", "spellCheck", "value"].forEach(function(name) {
   properties[name] = new PropertyInfoRecord(
@@ -229,6 +241,7 @@ reservedProps.forEach(function(name) {
     !1,
     name.toLowerCase(),
     null,
+    !1,
     !1
   );
 });
@@ -238,9 +251,9 @@ reservedProps.forEach(function(name) {
   "focusable",
   "preserveAlpha"
 ].forEach(function(name) {
-  properties[name] = new PropertyInfoRecord(name, 2, !1, name, null, !1);
+  properties[name] = new PropertyInfoRecord(name, 2, !1, name, null, !1, !1);
 });
-"allowFullScreen async autoFocus autoPlay controls default defer disabled disablePictureInPicture formNoValidate hidden loop noModule noValidate open playsInline readOnly required reversed scoped seamless itemScope"
+"allowFullScreen async autoFocus autoPlay controls default defer disabled disablePictureInPicture disableRemotePlayback formNoValidate hidden loop noModule noValidate open playsInline readOnly required reversed scoped seamless itemScope"
   .split(" ")
   .forEach(function(name) {
     properties[name] = new PropertyInfoRecord(
@@ -249,17 +262,18 @@ reservedProps.forEach(function(name) {
       !1,
       name.toLowerCase(),
       null,
+      !1,
       !1
     );
   });
 ["checked", "multiple", "muted", "selected"].forEach(function(name) {
-  properties[name] = new PropertyInfoRecord(name, 3, !0, name, null, !1);
+  properties[name] = new PropertyInfoRecord(name, 3, !0, name, null, !1, !1);
 });
 ["capture", "download"].forEach(function(name) {
-  properties[name] = new PropertyInfoRecord(name, 4, !1, name, null, !1);
+  properties[name] = new PropertyInfoRecord(name, 4, !1, name, null, !1, !1);
 });
 ["cols", "rows", "size", "span"].forEach(function(name) {
-  properties[name] = new PropertyInfoRecord(name, 6, !1, name, null, !1);
+  properties[name] = new PropertyInfoRecord(name, 6, !1, name, null, !1, !1);
 });
 ["rowSpan", "start"].forEach(function(name) {
   properties[name] = new PropertyInfoRecord(
@@ -268,6 +282,7 @@ reservedProps.forEach(function(name) {
     !1,
     name.toLowerCase(),
     null,
+    !1,
     !1
   );
 });
@@ -285,6 +300,7 @@ function capitalize(token) {
       !1,
       attributeName,
       null,
+      !1,
       !1
     );
   });
@@ -298,6 +314,7 @@ function capitalize(token) {
       !1,
       attributeName,
       "http://www.w3.org/1999/xlink",
+      !1,
       !1
     );
   });
@@ -309,6 +326,7 @@ function capitalize(token) {
     !1,
     attributeName,
     "http://www.w3.org/XML/1998/namespace",
+    !1,
     !1
   );
 });
@@ -319,6 +337,7 @@ function capitalize(token) {
     !1,
     attributeName.toLowerCase(),
     null,
+    !1,
     !1
   );
 });
@@ -328,7 +347,8 @@ properties.xlinkHref = new PropertyInfoRecord(
   !1,
   "xlink:href",
   "http://www.w3.org/1999/xlink",
-  !0
+  !0,
+  !1
 );
 ["src", "href", "action", "formAction"].forEach(function(attributeName) {
   properties[attributeName] = new PropertyInfoRecord(
@@ -337,6 +357,7 @@ properties.xlinkHref = new PropertyInfoRecord(
     !1,
     attributeName.toLowerCase(),
     null,
+    !0,
     !0
   );
 });
@@ -406,7 +427,7 @@ function createMarkupForProperty(name, value) {
       JSCompiler_inline_result.sanitizeURL &&
       ((value = "" + value), isJavaScriptProtocol.test(value))
     )
-      throw Error(formatProdErrorMessage(323, ""));
+      throw Error(formatProdErrorMessage(323));
     return name + '="' + (escapeTextForBrowser(value) + '"');
   }
   return isAttributeNameSafe(name)
@@ -495,6 +516,30 @@ function useReducer(reducer, initialArg, init) {
   );
   return [workInProgressHook.memoizedState, reducer];
 }
+function useMemo(nextCreate, deps) {
+  currentlyRenderingComponent = resolveCurrentlyRenderingComponent();
+  workInProgressHook = createWorkInProgressHook();
+  deps = void 0 === deps ? null : deps;
+  if (null !== workInProgressHook) {
+    var prevState = workInProgressHook.memoizedState;
+    if (null !== prevState && null !== deps) {
+      var prevDeps = prevState[1];
+      a: if (null === prevDeps) prevDeps = !1;
+      else {
+        for (var i$1 = 0; i$1 < prevDeps.length && i$1 < deps.length; i$1++)
+          if (!objectIs(deps[i$1], prevDeps[i$1])) {
+            prevDeps = !1;
+            break a;
+          }
+        prevDeps = !0;
+      }
+      if (prevDeps) return prevState[0];
+    }
+  }
+  nextCreate = nextCreate();
+  workInProgressHook.memoizedState = [nextCreate, deps];
+  return nextCreate;
+}
 function dispatchAction(componentIdentity, queue, action) {
   if (!(25 > numberOfReRenders)) throw Error(formatProdErrorMessage(301));
   if (componentIdentity === currentlyRenderingComponent)
@@ -512,43 +557,20 @@ function dispatchAction(componentIdentity, queue, action) {
     }
 }
 function noop() {}
-var currentThreadID = 0,
+var currentPartialRenderer = null,
   Dispatcher = {
     readContext: function(context) {
-      var threadID = currentThreadID;
+      var threadID = currentPartialRenderer.threadID;
       validateContextBounds(context, threadID);
       return context[threadID];
     },
     useContext: function(context) {
       resolveCurrentlyRenderingComponent();
-      var threadID = currentThreadID;
+      var threadID = currentPartialRenderer.threadID;
       validateContextBounds(context, threadID);
       return context[threadID];
     },
-    useMemo: function(nextCreate, deps) {
-      currentlyRenderingComponent = resolveCurrentlyRenderingComponent();
-      workInProgressHook = createWorkInProgressHook();
-      deps = void 0 === deps ? null : deps;
-      if (null !== workInProgressHook) {
-        var prevState = workInProgressHook.memoizedState;
-        if (null !== prevState && null !== deps) {
-          var prevDeps = prevState[1];
-          a: if (null === prevDeps) prevDeps = !1;
-          else {
-            for (var i$1 = 0; i$1 < prevDeps.length && i$1 < deps.length; i$1++)
-              if (!objectIs(deps[i$1], prevDeps[i$1])) {
-                prevDeps = !1;
-                break a;
-              }
-            prevDeps = !0;
-          }
-          if (prevDeps) return prevState[0];
-        }
-      }
-      nextCreate = nextCreate();
-      workInProgressHook.memoizedState = [nextCreate, deps];
-      return nextCreate;
-    },
+    useMemo: useMemo,
     useReducer: useReducer,
     useRef: function(initialValue) {
       currentlyRenderingComponent = resolveCurrentlyRenderingComponent();
@@ -563,8 +585,10 @@ var currentThreadID = 0,
       return useReducer(basicStateReducer, initialState);
     },
     useLayoutEffect: function() {},
-    useCallback: function(callback) {
-      return callback;
+    useCallback: function(callback, deps) {
+      return useMemo(function() {
+        return callback;
+      }, deps);
     },
     useImperativeHandle: noop,
     useEffect: noop,
@@ -585,8 +609,12 @@ var currentThreadID = 0,
         !1
       ];
     },
-    useEvent: function() {
-      return { clear: noop, setListener: noop };
+    useOpaqueIdentifier: function() {
+      return (
+        (currentPartialRenderer.identifierPrefix || "") +
+        "R:" +
+        (currentPartialRenderer.uniqueID++).toString(36)
+      );
     },
     useMutableSource: function(source, getSnapshot) {
       resolveCurrentlyRenderingComponent();
@@ -680,7 +708,7 @@ Object.keys(isUnitlessNumber).forEach(function(prop) {
 var uppercasePattern = /([A-Z])/g,
   msPattern = /^ms-/,
   toArray = React.Children.toArray,
-  ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher,
+  ReactCurrentDispatcher$1 = ReactSharedInternals.ReactCurrentDispatcher,
   newlineEatingTags = { listing: !0, pre: !0, textarea: !0 },
   VALID_TAG_REGEX = /^[a-zA-Z][a-zA-Z:_\.\-\d]*$/,
   validatedTagCache = {},
@@ -700,12 +728,6 @@ var hasOwnProperty$1 = Object.prototype.hasOwnProperty,
     suppressContentEditableWarning: null,
     suppressHydrationWarning: null
   };
-function validateRenderResult(child, type) {
-  if (void 0 === child)
-    throw Error(
-      formatProdErrorMessage(152, getComponentName(type) || "Component")
-    );
-}
 function resolve(child, context, threadID) {
   function processChild(element, Component) {
     var isClass = Component.prototype && Component.prototype.isReactComponent,
@@ -729,10 +751,8 @@ function resolve(child, context, threadID) {
         }
       };
     if (isClass) {
-      if (
-        ((isClass = new Component(element.props, publicContext, updater)),
-        "function" === typeof Component.getDerivedStateFromProps)
-      ) {
+      isClass = new Component(element.props, publicContext, updater);
+      if ("function" === typeof Component.getDerivedStateFromProps) {
         var partialState = Component.getDerivedStateFromProps.call(
           null,
           element.props,
@@ -741,68 +761,70 @@ function resolve(child, context, threadID) {
         null != partialState &&
           (isClass.state = Object.assign({}, isClass.state, partialState));
       }
-    } else if (
-      ((currentlyRenderingComponent = {}),
-      (isClass = Component(element.props, publicContext, updater)),
-      (isClass = finishHooks(Component, element.props, isClass, publicContext)),
-      null == isClass || null == isClass.render)
-    ) {
-      child = isClass;
-      validateRenderResult(child, Component);
-      return;
-    }
-    isClass.props = element.props;
-    isClass.context = publicContext;
-    isClass.updater = updater;
-    updater = isClass.state;
-    void 0 === updater && (isClass.state = updater = null);
-    if (
-      "function" === typeof isClass.UNSAFE_componentWillMount ||
-      "function" === typeof isClass.componentWillMount
-    )
+      isClass.props = element.props;
+      isClass.context = publicContext;
+      isClass.updater = updater;
+      updater = isClass.state;
+      void 0 === updater && (isClass.state = updater = null);
       if (
-        ("function" === typeof isClass.componentWillMount &&
-          "function" !== typeof Component.getDerivedStateFromProps &&
-          isClass.componentWillMount(),
-        "function" === typeof isClass.UNSAFE_componentWillMount &&
-          "function" !== typeof Component.getDerivedStateFromProps &&
-          isClass.UNSAFE_componentWillMount(),
-        queue.length)
-      ) {
-        updater = queue;
-        var oldReplace = replace;
-        queue = null;
-        replace = !1;
-        if (oldReplace && 1 === updater.length) isClass.state = updater[0];
-        else {
-          partialState = oldReplace ? updater[0] : isClass.state;
-          var dontMutate = !0;
-          for (
-            oldReplace = oldReplace ? 1 : 0;
-            oldReplace < updater.length;
-            oldReplace++
-          ) {
-            var partial = updater[oldReplace];
-            partial =
-              "function" === typeof partial
-                ? partial.call(
-                    isClass,
-                    partialState,
-                    element.props,
-                    publicContext
-                  )
-                : partial;
-            null != partial &&
-              (dontMutate
-                ? ((dontMutate = !1),
-                  (partialState = Object.assign({}, partialState, partial)))
-                : Object.assign(partialState, partial));
+        "function" === typeof isClass.UNSAFE_componentWillMount ||
+        "function" === typeof isClass.componentWillMount
+      )
+        if (
+          ("function" === typeof isClass.componentWillMount &&
+            "function" !== typeof Component.getDerivedStateFromProps &&
+            isClass.componentWillMount(),
+          "function" === typeof isClass.UNSAFE_componentWillMount &&
+            "function" !== typeof Component.getDerivedStateFromProps &&
+            isClass.UNSAFE_componentWillMount(),
+          queue.length)
+        ) {
+          updater = queue;
+          var oldReplace = replace;
+          queue = null;
+          replace = !1;
+          if (oldReplace && 1 === updater.length) isClass.state = updater[0];
+          else {
+            partialState = oldReplace ? updater[0] : isClass.state;
+            var dontMutate = !0;
+            for (
+              oldReplace = oldReplace ? 1 : 0;
+              oldReplace < updater.length;
+              oldReplace++
+            ) {
+              var partial = updater[oldReplace];
+              partial =
+                "function" === typeof partial
+                  ? partial.call(
+                      isClass,
+                      partialState,
+                      element.props,
+                      publicContext
+                    )
+                  : partial;
+              null != partial &&
+                (dontMutate
+                  ? ((dontMutate = !1),
+                    (partialState = Object.assign({}, partialState, partial)))
+                  : Object.assign(partialState, partial));
+            }
+            isClass.state = partialState;
           }
-          isClass.state = partialState;
-        }
-      } else queue = null;
-    child = isClass.render();
-    validateRenderResult(child, Component);
+        } else queue = null;
+      child = isClass.render();
+    } else
+      (currentlyRenderingComponent = {}),
+        (isClass = Component(element.props, publicContext, updater)),
+        (child = isClass = finishHooks(
+          Component,
+          element.props,
+          isClass,
+          publicContext
+        ));
+    if (void 0 === child)
+      throw Error(
+        formatProdErrorMessage(152, getComponentName(Component) || "Component")
+      );
   }
   for (; React.isValidElement(child); ) {
     var element$jscomp$0 = child,
@@ -813,7 +835,7 @@ function resolve(child, context, threadID) {
   return { child: child, context: context };
 }
 var ReactDOMServerRenderer = (function() {
-  function ReactDOMServerRenderer(children, makeStaticMarkup) {
+  function ReactDOMServerRenderer(children, makeStaticMarkup, options) {
     React.isValidElement(children)
       ? children.type !== REACT_FRAGMENT_TYPE
         ? (children = [children])
@@ -860,6 +882,8 @@ var ReactDOMServerRenderer = (function() {
     this.contextIndex = -1;
     this.contextStack = [];
     this.contextValueStack = [];
+    this.uniqueID = 0;
+    this.identifierPrefix = (options && options.identifierPrefix) || "";
   }
   var _proto = ReactDOMServerRenderer.prototype;
   _proto.destroy = function() {
@@ -896,10 +920,10 @@ var ReactDOMServerRenderer = (function() {
   };
   _proto.read = function(bytes) {
     if (this.exhausted) return null;
-    var prevThreadID = currentThreadID;
-    currentThreadID = this.threadID;
-    var prevDispatcher = ReactCurrentDispatcher.current;
-    ReactCurrentDispatcher.current = Dispatcher;
+    var prevPartialRenderer = currentPartialRenderer;
+    currentPartialRenderer = this;
+    var prevDispatcher = ReactCurrentDispatcher$1.current;
+    ReactCurrentDispatcher$1.current = Dispatcher;
     try {
       for (var out = [""], suspended = !1; out[0].length < bytes; ) {
         if (0 === this.stack.length) {
@@ -953,8 +977,8 @@ var ReactDOMServerRenderer = (function() {
       }
       return out[0];
     } finally {
-      (ReactCurrentDispatcher.current = prevDispatcher),
-        (currentThreadID = prevThreadID);
+      (ReactCurrentDispatcher$1.current = prevDispatcher),
+        (currentPartialRenderer = prevPartialRenderer);
     }
   };
   _proto.render = function(child, context, parentNamespace) {
@@ -993,8 +1017,9 @@ var ReactDOMServerRenderer = (function() {
     if ("string" === typeof elementType)
       return this.renderDOM(child, context, parentNamespace);
     switch (elementType) {
+      case REACT_LEGACY_HIDDEN_TYPE:
+      case REACT_DEBUG_TRACING_MODE_TYPE:
       case REACT_STRICT_MODE_TYPE:
-      case REACT_CONCURRENT_MODE_TYPE:
       case REACT_PROFILER_TYPE:
       case REACT_SUSPENSE_LIST_TYPE:
       case REACT_FRAGMENT_TYPE:
@@ -1228,7 +1253,7 @@ var ReactDOMServerRenderer = (function() {
         (null != initialValue.children ||
           null != initialValue.dangerouslySetInnerHTML)
       )
-        throw Error(formatProdErrorMessage(137, tag, ""));
+        throw Error(formatProdErrorMessage(137, tag));
       if (null != initialValue.dangerouslySetInnerHTML) {
         if (null != initialValue.children)
           throw Error(formatProdErrorMessage(60));
@@ -1241,12 +1266,28 @@ var ReactDOMServerRenderer = (function() {
           throw Error(formatProdErrorMessage(61));
       }
       if (null != initialValue.style && "object" !== typeof initialValue.style)
-        throw Error(formatProdErrorMessage(62, ""));
+        throw Error(formatProdErrorMessage(62));
     }
     initialValue = props;
     textareaChildren = this.makeStaticMarkup;
     optionChildren = 1 === this.stack.length;
     value = "<" + element.type;
+    b: if (-1 === tag.indexOf("-")) j = "string" === typeof initialValue.is;
+    else
+      switch (tag) {
+        case "annotation-xml":
+        case "color-profile":
+        case "font-face":
+        case "font-face-src":
+        case "font-face-uri":
+        case "font-face-format":
+        case "font-face-name":
+        case "missing-glyph":
+          j = !1;
+          break b;
+        default:
+          j = !0;
+      }
     for (out in initialValue)
       if (
         hasOwnProperty$1.call(initialValue, out) &&
@@ -1255,17 +1296,17 @@ var ReactDOMServerRenderer = (function() {
         var propValue = initialValue[out];
         if (null != propValue) {
           if ("style" === out) {
-            j = void 0;
-            var serialized = "",
+            var styleName = void 0,
+              serialized = "",
               delimiter = "";
-            for (j in propValue)
-              if (propValue.hasOwnProperty(j)) {
-                var isCustomProperty = 0 === j.indexOf("--"),
-                  styleValue = propValue[j];
+            for (styleName in propValue)
+              if (propValue.hasOwnProperty(styleName)) {
+                var isCustomProperty = 0 === styleName.indexOf("--"),
+                  styleValue = propValue[styleName];
                 if (null != styleValue) {
-                  if (isCustomProperty) var JSCompiler_temp = j;
+                  if (isCustomProperty) var JSCompiler_temp = styleName;
                   else if (
-                    ((JSCompiler_temp = j),
+                    ((JSCompiler_temp = styleName),
                     styleNameCache.hasOwnProperty(JSCompiler_temp))
                   )
                     JSCompiler_temp = styleNameCache[JSCompiler_temp];
@@ -1279,7 +1320,7 @@ var ReactDOMServerRenderer = (function() {
                     JSCompiler_temp = styleNameCache[JSCompiler_temp] = result;
                   }
                   serialized += delimiter + JSCompiler_temp + ":";
-                  delimiter = j;
+                  delimiter = styleName;
                   isCustomProperty =
                     null == styleValue ||
                     "boolean" === typeof styleValue ||
@@ -1298,33 +1339,16 @@ var ReactDOMServerRenderer = (function() {
               }
             propValue = serialized || null;
           }
-          j = null;
-          b: if (((isCustomProperty = initialValue), -1 === tag.indexOf("-")))
-            isCustomProperty = "string" === typeof isCustomProperty.is;
-          else
-            switch (tag) {
-              case "annotation-xml":
-              case "color-profile":
-              case "font-face":
-              case "font-face-src":
-              case "font-face-uri":
-              case "font-face-format":
-              case "font-face-name":
-              case "missing-glyph":
-                isCustomProperty = !1;
-                break b;
-              default:
-                isCustomProperty = !0;
-            }
-          isCustomProperty
+          styleName = null;
+          j
             ? RESERVED_PROPS.hasOwnProperty(out) ||
-              ((j = out),
-              (j =
-                isAttributeNameSafe(j) && null != propValue
-                  ? j + '="' + (escapeTextForBrowser(propValue) + '"')
+              ((styleName = out),
+              (styleName =
+                isAttributeNameSafe(styleName) && null != propValue
+                  ? styleName + '="' + (escapeTextForBrowser(propValue) + '"')
                   : ""))
-            : (j = createMarkupForProperty(out, propValue));
-          j && (value += " " + j);
+            : (styleName = createMarkupForProperty(out, propValue));
+          styleName && (value += " " + styleName);
         }
       }
     textareaChildren || (optionChildren && (value += ' data-reactroot=""'));
@@ -1382,8 +1406,8 @@ var ReactDOMServerRenderer = (function() {
 exports.renderToNodeStream = function() {
   throw Error(formatProdErrorMessage(207));
 };
-exports.renderToStaticMarkup = function(element) {
-  element = new ReactDOMServerRenderer(element, !0);
+exports.renderToStaticMarkup = function(element, options) {
+  element = new ReactDOMServerRenderer(element, !0, options);
   try {
     return element.read(Infinity);
   } finally {
@@ -1393,8 +1417,8 @@ exports.renderToStaticMarkup = function(element) {
 exports.renderToStaticNodeStream = function() {
   throw Error(formatProdErrorMessage(208));
 };
-exports.renderToString = function(element) {
-  element = new ReactDOMServerRenderer(element, !1);
+exports.renderToString = function(element, options) {
+  element = new ReactDOMServerRenderer(element, !1, options);
   try {
     return element.read(Infinity);
   } finally {

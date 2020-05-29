@@ -21,6 +21,9 @@ var assign = require("object-assign");
 // TODO: this is special because it gets imported during build.
 var ReactVersion = "16.13.1";
 
+// ATTENTION
+// When adding new symbols to this file,
+// Please consider also adding to 'react-devtools-shared/src/backend/ReactSymbols'
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
 // nor polyfill, then a plain number is used for performance.
 var REACT_ELEMENT_TYPE = 0xeac7;
@@ -29,14 +32,10 @@ exports.Fragment = 0xeacb;
 exports.StrictMode = 0xeacc;
 exports.Profiler = 0xead2;
 var REACT_PROVIDER_TYPE = 0xeacd;
-var REACT_CONTEXT_TYPE = 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-// (unstable) APIs that have been removed. Can we remove the symbols?
-
-var REACT_ASYNC_MODE_TYPE = 0xeacf;
-var REACT_CONCURRENT_MODE_TYPE = 0xeacf;
+var REACT_CONTEXT_TYPE = 0xeace;
 var REACT_FORWARD_REF_TYPE = 0xead0;
 exports.Suspense = 0xead1;
-exports.SuspenseList = 0xead8;
+exports.unstable_SuspenseList = 0xead8;
 var REACT_MEMO_TYPE = 0xead3;
 var REACT_LAZY_TYPE = 0xead4;
 var REACT_BLOCK_TYPE = 0xead9;
@@ -44,6 +43,10 @@ var REACT_SERVER_BLOCK_TYPE = 0xeada;
 var REACT_FUNDAMENTAL_TYPE = 0xead5;
 var REACT_RESPONDER_TYPE = 0xead6;
 var REACT_SCOPE_TYPE = 0xead7;
+var REACT_OPAQUE_ID_TYPE = 0xeae0;
+exports.unstable_DebugTracingMode = 0xeae1;
+var REACT_OFFSCREEN_TYPE = 0xeae2;
+exports.unstable_LegacyHidden = 0xeae3;
 
 if (typeof Symbol === "function" && Symbol.for) {
   var symbolFor = Symbol.for;
@@ -54,11 +57,9 @@ if (typeof Symbol === "function" && Symbol.for) {
   exports.Profiler = symbolFor("react.profiler");
   REACT_PROVIDER_TYPE = symbolFor("react.provider");
   REACT_CONTEXT_TYPE = symbolFor("react.context");
-  REACT_ASYNC_MODE_TYPE = symbolFor("react.async_mode");
-  REACT_CONCURRENT_MODE_TYPE = symbolFor("react.concurrent_mode");
   REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
   exports.Suspense = symbolFor("react.suspense");
-  exports.SuspenseList = symbolFor("react.suspense_list");
+  exports.unstable_SuspenseList = symbolFor("react.suspense_list");
   REACT_MEMO_TYPE = symbolFor("react.memo");
   REACT_LAZY_TYPE = symbolFor("react.lazy");
   REACT_BLOCK_TYPE = symbolFor("react.block");
@@ -66,6 +67,10 @@ if (typeof Symbol === "function" && Symbol.for) {
   REACT_FUNDAMENTAL_TYPE = symbolFor("react.fundamental");
   REACT_RESPONDER_TYPE = symbolFor("react.responder");
   REACT_SCOPE_TYPE = symbolFor("react.scope");
+  REACT_OPAQUE_ID_TYPE = symbolFor("react.opaque.id");
+  exports.unstable_DebugTracingMode = symbolFor("react.debug_trace_mode");
+  REACT_OFFSCREEN_TYPE = symbolFor("react.offscreen");
+  exports.unstable_LegacyHidden = symbolFor("react.legacy_hidden");
 }
 
 var MAYBE_ITERATOR_SYMBOL = typeof Symbol === "function" && Symbol.iterator;
@@ -122,26 +127,18 @@ function error(format) {
 
 function printWarning(level, format, args) {
   {
-    var hasExistingStack =
-      args.length > 0 &&
-      typeof args[args.length - 1] === "string" &&
-      args[args.length - 1].indexOf("\n    in") === 0;
+    var React = require("react");
 
-    if (!hasExistingStack) {
-      var React = require("react");
+    var ReactSharedInternals =
+      React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
 
-      var ReactSharedInternals =
-        React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
+    if (ReactSharedInternals != null) {
+      var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+      var stack = ReactDebugCurrentFrame.getStackAddendum();
 
-      if (ReactSharedInternals != null) {
-        var ReactDebugCurrentFrame =
-          ReactSharedInternals.ReactDebugCurrentFrame;
-        var stack = ReactDebugCurrentFrame.getStackAddendum();
-
-        if (stack !== "") {
-          format += "%s";
-          args.push(stack);
-        }
+      if (stack !== "") {
+        format += "%s";
+        args.push(stack);
       }
     } // TODO: don't ignore level and pass it down somewhere too.
 
@@ -463,7 +460,7 @@ function getComponentName(type) {
     case exports.Suspense:
       return "Suspense";
 
-    case exports.SuspenseList:
+    case exports.unstable_SuspenseList:
       return "SuspenseList";
   }
 
@@ -903,79 +900,6 @@ function isValidElement(object) {
   );
 }
 
-var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
-function describeComponentFrame(name, source, ownerName) {
-  var sourceInfo = "";
-
-  if (source) {
-    var path = source.fileName;
-    var fileName = path.replace(BEFORE_SLASH_RE, "");
-
-    {
-      // In DEV, include code for a common special case:
-      // prefer "folder/index.js" instead of just "index.js".
-      if (/^index\./.test(fileName)) {
-        var match = path.match(BEFORE_SLASH_RE);
-
-        if (match) {
-          var pathBeforeSlash = match[1];
-
-          if (pathBeforeSlash) {
-            var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, "");
-            fileName = folderName + "/" + fileName;
-          }
-        }
-      }
-    }
-
-    sourceInfo = " (at " + fileName + ":" + source.lineNumber + ")";
-  } else if (ownerName) {
-    sourceInfo = " (created by " + ownerName + ")";
-  }
-
-  return "\n    in " + (name || "Unknown") + sourceInfo;
-}
-
-var ReactDebugCurrentFrame = {};
-var currentlyValidatingElement = null;
-function setCurrentlyValidatingElement(element) {
-  {
-    currentlyValidatingElement = element;
-  }
-}
-
-{
-  ReactDebugCurrentFrame.setCurrentlyValidatingElement = function(element) {
-    {
-      currentlyValidatingElement = element;
-    }
-  }; // Stack implementation injected by the current renderer.
-
-  ReactDebugCurrentFrame.getCurrentStack = null;
-
-  ReactDebugCurrentFrame.getStackAddendum = function() {
-    var stack = ""; // Add an extra top frame while an element is being validated
-
-    if (currentlyValidatingElement) {
-      var name = getComponentName(currentlyValidatingElement.type);
-      var owner = currentlyValidatingElement._owner;
-      stack += describeComponentFrame(
-        name,
-        currentlyValidatingElement._source,
-        owner && getComponentName(owner.type)
-      );
-    } // Delegate to the injected renderer-specific implementation
-
-    var impl = ReactDebugCurrentFrame.getCurrentStack;
-
-    if (impl) {
-      stack += impl() || "";
-    }
-
-    return stack;
-  };
-}
-
 var SEPARATOR = ".";
 var SUBSEPARATOR = ":";
 /**
@@ -1145,15 +1069,6 @@ function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
         );
       }
     } else if (type === "object") {
-      var addendum = "";
-
-      {
-        addendum =
-          " If you meant to render a collection of children, use an array " +
-          "instead." +
-          ReactDebugCurrentFrame.getStackAddendum();
-      }
-
       var childrenString = "" + children;
 
       {
@@ -1163,8 +1078,7 @@ function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
               (childrenString === "[object Object]"
                 ? "object with keys {" + Object.keys(children).join(", ") + "}"
                 : childrenString) +
-              ")." +
-              addendum
+              "). If you meant to render a collection of children, use an array instead."
           );
         }
       }
@@ -1179,7 +1093,7 @@ function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
  *
  * See https://reactjs.org/docs/react-api.html#reactchildrenmap
  *
- * The provided mapFunction(child, key, index) will be called for each
+ * The provided mapFunction(child, index) will be called for each
  * leaf child.
  *
  * @param {?*} children Children tree container.
@@ -1392,11 +1306,12 @@ function createContext(defaultValue, calculateChangedBits) {
         get: function() {
           return context.displayName;
         },
-        set: function() {
+        set: function(displayName) {
           if (!hasWarnedAboutDisplayNameOnConsumer) {
             warn(
               "Setting `displayName` on Context.Consumer has no effect. " +
-                "You should set it directly on the context with Context.displayName = 'NamedContext'."
+                "You should set it directly on the context with Context.displayName = '%s'.",
+              displayName
             );
 
             hasWarnedAboutDisplayNameOnConsumer = true;
@@ -1567,10 +1482,30 @@ function forwardRef(render) {
     }
   }
 
-  return {
+  var elementType = {
     $$typeof: REACT_FORWARD_REF_TYPE,
     render: render
   };
+
+  {
+    var ownName;
+    Object.defineProperty(elementType, "displayName", {
+      enumerable: false,
+      configurable: true,
+      get: function() {
+        return ownName;
+      },
+      set: function(name) {
+        ownName = name;
+
+        if (render.displayName == null) {
+          render.displayName = name;
+        }
+      }
+    });
+  }
+
+  return elementType;
 }
 
 function isValidElementType(type) {
@@ -1578,11 +1513,12 @@ function isValidElementType(type) {
     typeof type === "string" ||
     typeof type === "function" || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
     type === exports.Fragment ||
-    type === REACT_CONCURRENT_MODE_TYPE ||
     type === exports.Profiler ||
+    type === exports.unstable_DebugTracingMode ||
     type === exports.StrictMode ||
     type === exports.Suspense ||
-    type === exports.SuspenseList ||
+    type === exports.unstable_SuspenseList ||
+    type === exports.unstable_LegacyHidden ||
     (typeof type === "object" &&
       type !== null &&
       (type.$$typeof === REACT_LAZY_TYPE ||
@@ -1609,11 +1545,31 @@ function memo(type, compare) {
     }
   }
 
-  return {
+  var elementType = {
     $$typeof: REACT_MEMO_TYPE,
     type: type,
     compare: compare === undefined ? null : compare
   };
+
+  {
+    var ownName;
+    Object.defineProperty(elementType, "displayName", {
+      enumerable: false,
+      configurable: true,
+      get: function() {
+        return ownName;
+      },
+      set: function(name) {
+        ownName = name;
+
+        if (type.displayName == null) {
+          type.displayName = name;
+        }
+      }
+    });
+  }
+
+  return elementType;
 }
 
 function lazyInitializer$1(payload) {
@@ -1818,6 +1774,10 @@ function useDeferredValue(value, config) {
   var dispatcher = resolveDispatcher();
   return dispatcher.useDeferredValue(value, config);
 }
+function useOpaqueIdentifier() {
+  var dispatcher = resolveDispatcher();
+  return dispatcher.useOpaqueIdentifier();
+}
 function useMutableSource(source, getSnapshot, subscribe) {
   var dispatcher = resolveDispatcher();
   return dispatcher.useMutableSource(source, getSnapshot, subscribe);
@@ -1851,17 +1811,443 @@ var debugRenderPhaseSideEffectsForStrictMode =
     dynamicFeatureFlags.disableInputAttributeSyncing,
   enableTrustedTypesIntegration =
     dynamicFeatureFlags.enableTrustedTypesIntegration,
-  warnAboutShorthandPropertyCollision =
-    dynamicFeatureFlags.warnAboutShorthandPropertyCollision,
   disableSchedulerTimeoutBasedOnReactExpirationTime =
     dynamicFeatureFlags.disableSchedulerTimeoutBasedOnReactExpirationTime,
   warnAboutSpreadingKeyToJSX = dynamicFeatureFlags.warnAboutSpreadingKeyToJSX,
+  enableComponentStackLocations =
+    dynamicFeatureFlags.enableComponentStackLocations,
   replayFailedUnitOfWorkWithInvokeGuardedCallback =
     dynamicFeatureFlags.replayFailedUnitOfWorkWithInvokeGuardedCallback,
-  enableModernEventSystem = dynamicFeatureFlags.enableModernEventSystem; // On WWW, true is used for a new modern build.
+  enableModernEventSystem = dynamicFeatureFlags.enableModernEventSystem,
+  enableFilterEmptyStringAttributesDOM =
+    dynamicFeatureFlags.enableFilterEmptyStringAttributesDOM,
+  enableLegacyFBSupport = dynamicFeatureFlags.enableLegacyFBSupport,
+  enableDebugTracing = dynamicFeatureFlags.enableDebugTracing,
+  deferRenderPhaseUpdateToNextBatch =
+    dynamicFeatureFlags.deferRenderPhaseUpdateToNextBatch; // On WWW, true is used for a new modern build.
+
+// Helpers to patch console.logs to avoid logging during side-effect free
+// replaying on render function. This currently only patches the object
+// lazily which won't cover if the log function was extracted eagerly.
+// We could also eagerly patch the method.
+var disabledDepth = 0;
+var prevLog;
+var prevInfo;
+var prevWarn;
+var prevError;
+
+function disabledLog() {}
+
+disabledLog.__reactDisabledLog = true;
+function disableLogs() {
+  {
+    if (disabledDepth === 0) {
+      /* eslint-disable react-internal/no-production-logging */
+      prevLog = console.log;
+      prevInfo = console.info;
+      prevWarn = console.warn;
+      prevError = console.error; // $FlowFixMe Flow thinks console is immutable.
+
+      console.log = console.info = console.warn = console.error = disabledLog;
+      /* eslint-enable react-internal/no-production-logging */
+    }
+
+    disabledDepth++;
+  }
+}
+function reenableLogs() {
+  {
+    disabledDepth--;
+
+    if (disabledDepth === 0) {
+      /* eslint-disable react-internal/no-production-logging */
+      // $FlowFixMe Flow thinks console is immutable.
+      console.log = prevLog; // $FlowFixMe Flow thinks console is immutable.
+
+      console.info = prevInfo; // $FlowFixMe Flow thinks console is immutable.
+
+      console.warn = prevWarn; // $FlowFixMe Flow thinks console is immutable.
+
+      console.error = prevError;
+      /* eslint-enable react-internal/no-production-logging */
+    }
+
+    if (disabledDepth < 0) {
+      error(
+        "disabledDepth fell below zero. " +
+          "This is a bug in React. Please file an issue."
+      );
+    }
+  }
+}
+
+var ReactDebugCurrentFrame = {};
+var currentExtraStackFrame = null;
+function setExtraStackFrame(stack) {
+  {
+    currentExtraStackFrame = stack;
+  }
+}
+
+{
+  ReactDebugCurrentFrame.setExtraStackFrame = function(stack) {
+    {
+      currentExtraStackFrame = stack;
+    }
+  }; // Stack implementation injected by the current renderer.
+
+  ReactDebugCurrentFrame.getCurrentStack = null;
+
+  ReactDebugCurrentFrame.getStackAddendum = function() {
+    var stack = ""; // Add an extra top frame while an element is being validated
+
+    if (currentExtraStackFrame) {
+      stack += currentExtraStackFrame;
+    } // Delegate to the injected renderer-specific implementation
+
+    var impl = ReactDebugCurrentFrame.getCurrentStack;
+
+    if (impl) {
+      stack += impl() || "";
+    }
+
+    return stack;
+  };
+}
+
+/**
+ * Used by act() to track whether you're inside an act() scope.
+ */
+var IsSomeRendererActing = {
+  current: false
+};
+
+var ReactSharedInternals = {
+  ReactCurrentDispatcher: ReactCurrentDispatcher,
+  ReactCurrentBatchConfig: ReactCurrentBatchConfig,
+  ReactCurrentOwner: ReactCurrentOwner,
+  IsSomeRendererActing: IsSomeRendererActing,
+  // Used by renderers to avoid bundling object-assign twice in UMD bundles:
+  assign: assign
+};
+
+{
+  ReactSharedInternals.ReactDebugCurrentFrame = ReactDebugCurrentFrame;
+}
+
+var ReactCurrentDispatcher$1 = ReactSharedInternals.ReactCurrentDispatcher;
+var prefix;
+function describeBuiltInComponentFrame(name, source, ownerFn) {
+  if (enableComponentStackLocations) {
+    if (prefix === undefined) {
+      // Extract the VM specific prefix used by each line.
+      try {
+        throw Error();
+      } catch (x) {
+        var match = x.stack.trim().match(/\n( *(at )?)/);
+        prefix = (match && match[1]) || "";
+      }
+    } // We use the prefix to ensure our stacks line up with native stack frames.
+
+    return "\n" + prefix + name;
+  } else {
+    var ownerName = null;
+
+    if (ownerFn) {
+      ownerName = ownerFn.displayName || ownerFn.name || null;
+    }
+
+    return describeComponentFrame(name, source, ownerName);
+  }
+}
+var reentry = false;
+var componentFrameCache;
+
+{
+  var PossiblyWeakMap = typeof WeakMap === "function" ? WeakMap : Map;
+  componentFrameCache = new PossiblyWeakMap();
+}
+
+function describeNativeComponentFrame(fn, construct) {
+  // If something asked for a stack inside a fake render, it should get ignored.
+  if (!fn || reentry) {
+    return "";
+  }
+
+  {
+    var frame = componentFrameCache.get(fn);
+
+    if (frame !== undefined) {
+      return frame;
+    }
+  }
+
+  var control;
+  reentry = true;
+  var previousPrepareStackTrace = Error.prepareStackTrace; // $FlowFixMe It does accept undefined.
+
+  Error.prepareStackTrace = undefined;
+  var previousDispatcher;
+
+  {
+    previousDispatcher = ReactCurrentDispatcher$1.current; // Set the dispatcher in DEV because this might be call in the render function
+    // for warnings.
+
+    ReactCurrentDispatcher$1.current = null;
+    disableLogs();
+  }
+
+  try {
+    // This should throw.
+    if (construct) {
+      // Something should be setting the props in the constructor.
+      var Fake = function() {
+        throw Error();
+      }; // $FlowFixMe
+
+      Object.defineProperty(Fake.prototype, "props", {
+        set: function() {
+          // We use a throwing setter instead of frozen or non-writable props
+          // because that won't throw in a non-strict mode function.
+          throw Error();
+        }
+      });
+
+      if (typeof Reflect === "object" && Reflect.construct) {
+        // We construct a different control for this case to include any extra
+        // frames added by the construct call.
+        try {
+          Reflect.construct(Fake, []);
+        } catch (x) {
+          control = x;
+        }
+
+        Reflect.construct(fn, [], Fake);
+      } else {
+        try {
+          Fake.call();
+        } catch (x) {
+          control = x;
+        }
+
+        fn.call(Fake.prototype);
+      }
+    } else {
+      try {
+        throw Error();
+      } catch (x) {
+        control = x;
+      }
+
+      fn();
+    }
+  } catch (sample) {
+    // This is inlined manually because closure doesn't do it for us.
+    if (sample && control && typeof sample.stack === "string") {
+      // This extracts the first frame from the sample that isn't also in the control.
+      // Skipping one frame that we assume is the frame that calls the two.
+      var sampleLines = sample.stack.split("\n");
+      var controlLines = control.stack.split("\n");
+      var s = sampleLines.length - 1;
+      var c = controlLines.length - 1;
+
+      while (s >= 1 && c >= 0 && sampleLines[s] !== controlLines[c]) {
+        // We expect at least one stack frame to be shared.
+        // Typically this will be the root most one. However, stack frames may be
+        // cut off due to maximum stack limits. In this case, one maybe cut off
+        // earlier than the other. We assume that the sample is longer or the same
+        // and there for cut off earlier. So we should find the root most frame in
+        // the sample somewhere in the control.
+        c--;
+      }
+
+      for (; s >= 1 && c >= 0; s--, c--) {
+        // Next we find the first one that isn't the same which should be the
+        // frame that called our sample function and the control.
+        if (sampleLines[s] !== controlLines[c]) {
+          // In V8, the first line is describing the message but other VMs don't.
+          // If we're about to return the first line, and the control is also on the same
+          // line, that's a pretty good indicator that our sample threw at same line as
+          // the control. I.e. before we entered the sample frame. So we ignore this result.
+          // This can happen if you passed a class to function component, or non-function.
+          if (s !== 1 || c !== 1) {
+            do {
+              s--;
+              c--; // We may still have similar intermediate frames from the construct call.
+              // The next one that isn't the same should be our match though.
+
+              if (c < 0 || sampleLines[s] !== controlLines[c]) {
+                // V8 adds a "new" prefix for native classes. Let's remove it to make it prettier.
+                var _frame = "\n" + sampleLines[s].replace(" at new ", " at ");
+
+                {
+                  if (typeof fn === "function") {
+                    componentFrameCache.set(fn, _frame);
+                  }
+                } // Return the line we found.
+
+                return _frame;
+              }
+            } while (s >= 1 && c >= 0);
+          }
+
+          break;
+        }
+      }
+    }
+  } finally {
+    reentry = false;
+
+    {
+      ReactCurrentDispatcher$1.current = previousDispatcher;
+      reenableLogs();
+    }
+
+    Error.prepareStackTrace = previousPrepareStackTrace;
+  } // Fallback to just using the name if we couldn't make it throw.
+
+  var name = fn ? fn.displayName || fn.name : "";
+  var syntheticFrame = name ? describeBuiltInComponentFrame(name) : "";
+
+  {
+    if (typeof fn === "function") {
+      componentFrameCache.set(fn, syntheticFrame);
+    }
+  }
+
+  return syntheticFrame;
+}
+var BEFORE_SLASH_RE = /^(.*)[\\\/]/;
+
+function describeComponentFrame(name, source, ownerName) {
+  var sourceInfo = "";
+
+  if (source) {
+    var path = source.fileName;
+    var fileName = path.replace(BEFORE_SLASH_RE, ""); // In DEV, include code for a common special case:
+    // prefer "folder/index.js" instead of just "index.js".
+
+    if (/^index\./.test(fileName)) {
+      var match = path.match(BEFORE_SLASH_RE);
+
+      if (match) {
+        var pathBeforeSlash = match[1];
+
+        if (pathBeforeSlash) {
+          var folderName = pathBeforeSlash.replace(BEFORE_SLASH_RE, "");
+          fileName = folderName + "/" + fileName;
+        }
+      }
+    }
+
+    sourceInfo = " (at " + fileName + ":" + source.lineNumber + ")";
+  } else if (ownerName) {
+    sourceInfo = " (created by " + ownerName + ")";
+  }
+
+  return "\n    in " + (name || "Unknown") + sourceInfo;
+}
+function describeFunctionComponentFrame(fn, source, ownerFn) {
+  if (enableComponentStackLocations) {
+    return describeNativeComponentFrame(fn, false);
+  } else {
+    if (!fn) {
+      return "";
+    }
+
+    var name = fn.displayName || fn.name || null;
+    var ownerName = null;
+
+    if (ownerFn) {
+      ownerName = ownerFn.displayName || ownerFn.name || null;
+    }
+
+    return describeComponentFrame(name, source, ownerName);
+  }
+}
+
+function shouldConstruct(Component) {
+  var prototype = Component.prototype;
+  return !!(prototype && prototype.isReactComponent);
+}
+
+function describeUnknownElementTypeFrameInDEV(type, source, ownerFn) {
+  if (type == null) {
+    return "";
+  }
+
+  if (typeof type === "function") {
+    if (enableComponentStackLocations) {
+      return describeNativeComponentFrame(type, shouldConstruct(type));
+    } else {
+      return describeFunctionComponentFrame(type, source, ownerFn);
+    }
+  }
+
+  if (typeof type === "string") {
+    return describeBuiltInComponentFrame(type, source, ownerFn);
+  }
+
+  switch (type) {
+    case exports.Suspense:
+      return describeBuiltInComponentFrame("Suspense", source, ownerFn);
+
+    case exports.unstable_SuspenseList:
+      return describeBuiltInComponentFrame("SuspenseList", source, ownerFn);
+  }
+
+  if (typeof type === "object") {
+    switch (type.$$typeof) {
+      case REACT_FORWARD_REF_TYPE:
+        return describeFunctionComponentFrame(type.render, source, ownerFn);
+
+      case REACT_MEMO_TYPE:
+        // Memo may contain any component type so we recursively resolve it.
+        return describeUnknownElementTypeFrameInDEV(type.type, source, ownerFn);
+
+      case REACT_BLOCK_TYPE:
+        return describeFunctionComponentFrame(type._render, source, ownerFn);
+
+      case REACT_LAZY_TYPE: {
+        var lazyComponent = type;
+        var payload = lazyComponent._payload;
+        var init = lazyComponent._init;
+
+        try {
+          // Lazy may contain any component type so we recursively resolve it.
+          return describeUnknownElementTypeFrameInDEV(
+            init(payload),
+            source,
+            ownerFn
+          );
+        } catch (x) {}
+      }
+    }
+  }
+
+  return "";
+}
 
 var loggedTypeFailures = {};
-function checkPropTypes(typeSpecs, values, location, componentName) {
+var ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+
+function setCurrentlyValidatingElement(element) {
+  {
+    if (element) {
+      var owner = element._owner;
+      var stack = describeUnknownElementTypeFrameInDEV(
+        element.type,
+        element._source,
+        owner ? owner.type : null
+      );
+      ReactDebugCurrentFrame$1.setExtraStackFrame(stack);
+    } else {
+      ReactDebugCurrentFrame$1.setExtraStackFrame(null);
+    }
+  }
+}
+
+function checkPropTypes(typeSpecs, values, location, componentName, element) {
   {
     // $FlowFixMe This is okay but Flow doesn't know it.
     var has = Function.call.bind(Object.prototype.hasOwnProperty);
@@ -1905,6 +2291,8 @@ function checkPropTypes(typeSpecs, values, location, componentName) {
         }
 
         if (error$1 && !(error$1 instanceof Error)) {
+          setCurrentlyValidatingElement(element);
+
           error(
             "%s: type specification of %s" +
               " `%s` is invalid; the type checker " +
@@ -1917,6 +2305,8 @@ function checkPropTypes(typeSpecs, values, location, componentName) {
             typeSpecName,
             typeof error$1
           );
+
+          setCurrentlyValidatingElement(null);
         }
 
         if (
@@ -1926,10 +2316,29 @@ function checkPropTypes(typeSpecs, values, location, componentName) {
           // Only monitor this failure once because there tends to be a lot of the
           // same error.
           loggedTypeFailures[error$1.message] = true;
+          setCurrentlyValidatingElement(element);
 
           error("Failed %s type: %s", location, error$1.message);
+
+          setCurrentlyValidatingElement(null);
         }
       }
+    }
+  }
+}
+
+function setCurrentlyValidatingElement$1(element) {
+  {
+    if (element) {
+      var owner = element._owner;
+      var stack = describeUnknownElementTypeFrameInDEV(
+        element.type,
+        element._source,
+        owner ? owner.type : null
+      );
+      setExtraStackFrame(stack);
+    } else {
+      setExtraStackFrame(null);
     }
   }
 }
@@ -2035,18 +2444,18 @@ function validateExplicitKey(element, parentType) {
       ".";
   }
 
-  setCurrentlyValidatingElement(element);
-
   {
+    setCurrentlyValidatingElement$1(element);
+
     error(
       'Each child in a list should have a unique "key" prop.' +
         "%s%s See https://fb.me/react-warning-keys for more information.",
       currentComponentErrorInfo,
       childOwner
     );
-  }
 
-  setCurrentlyValidatingElement(null);
+    setCurrentlyValidatingElement$1(null);
+  }
 }
 /**
  * Ensure that every element either is passed in a static location, in an
@@ -2127,9 +2536,7 @@ function validatePropTypes(element) {
     }
 
     if (propTypes) {
-      setCurrentlyValidatingElement(element);
-      checkPropTypes(propTypes, element.props, "prop", name);
-      setCurrentlyValidatingElement(null);
+      checkPropTypes(propTypes, element.props, "prop", name, element);
     } else if (type.PropTypes !== undefined && !propTypesMisspellWarningShown) {
       propTypesMisspellWarningShown = true;
 
@@ -2157,28 +2564,32 @@ function validatePropTypes(element) {
 
 function validateFragmentProps(fragment) {
   {
-    setCurrentlyValidatingElement(fragment);
     var keys = Object.keys(fragment.props);
 
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i];
 
       if (key !== "children" && key !== "key") {
+        setCurrentlyValidatingElement$1(fragment);
+
         error(
           "Invalid prop `%s` supplied to `React.Fragment`. " +
             "React.Fragment can only have `key` and `children` props.",
           key
         );
 
+        setCurrentlyValidatingElement$1(null);
         break;
       }
     }
 
     if (fragment.ref !== null) {
-      error("Invalid attribute `ref` supplied to `React.Fragment`.");
-    }
+      setCurrentlyValidatingElement$1(fragment);
 
-    setCurrentlyValidatingElement(null);
+      error("Invalid attribute `ref` supplied to `React.Fragment`.");
+
+      setCurrentlyValidatingElement$1(null);
+    }
   }
 }
 function createElementWithValidation(type, props, children) {
@@ -2282,32 +2693,6 @@ function createMutableSource(source, getVersion) {
   }
 
   return mutableSource;
-}
-
-/**
- * Used by act() to track whether you're inside an act() scope.
- */
-var IsSomeRendererActing = {
-  current: false
-};
-
-var ReactSharedInternals = {
-  ReactCurrentDispatcher: ReactCurrentDispatcher,
-  ReactCurrentBatchConfig: ReactCurrentBatchConfig,
-  ReactCurrentOwner: ReactCurrentOwner,
-  IsSomeRendererActing: IsSomeRendererActing,
-  // Used by renderers to avoid bundling object-assign twice in UMD bundles:
-  assign: assign
-};
-
-{
-  Object.assign(ReactSharedInternals, {
-    // These should not be included in production.
-    ReactDebugCurrentFrame: ReactDebugCurrentFrame,
-    // Shim for React DOM 16.0.0 which still destructured (but not used) this.
-    // TODO: remove in React 17.0.
-    ReactComponentTreeHook: {}
-  });
 }
 
 var hasBadMapPolyfill;
@@ -2654,7 +3039,24 @@ function jsxDEV(type, config, maybeKey, source, self) {
 }
 
 var ReactCurrentOwner$2 = ReactSharedInternals.ReactCurrentOwner;
-var ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
+var ReactDebugCurrentFrame$2 = ReactSharedInternals.ReactDebugCurrentFrame;
+
+function setCurrentlyValidatingElement$2(element) {
+  {
+    if (element) {
+      var owner = element._owner;
+      var stack = describeUnknownElementTypeFrameInDEV(
+        element.type,
+        element._source,
+        owner ? owner.type : null
+      );
+      ReactDebugCurrentFrame$2.setExtraStackFrame(stack);
+    } else {
+      ReactDebugCurrentFrame$2.setExtraStackFrame(null);
+    }
+  }
+}
+
 var propTypesMisspellWarningShown$1;
 
 {
@@ -2775,7 +3177,7 @@ function validateExplicitKey$1(element, parentType) {
         ".";
     }
 
-    ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(element);
+    setCurrentlyValidatingElement$2(element);
 
     error(
       'Each child in a list should have a unique "key" prop.' +
@@ -2784,7 +3186,7 @@ function validateExplicitKey$1(element, parentType) {
       childOwner
     );
 
-    ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(null);
+    setCurrentlyValidatingElement$2(null);
   }
 }
 /**
@@ -2868,9 +3270,7 @@ function validatePropTypes$1(element) {
     }
 
     if (propTypes) {
-      ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(element);
-      checkPropTypes(propTypes, element.props, "prop", name);
-      ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(null);
+      checkPropTypes(propTypes, element.props, "prop", name, element);
     } else if (
       type.PropTypes !== undefined &&
       !propTypesMisspellWarningShown$1
@@ -2901,28 +3301,32 @@ function validatePropTypes$1(element) {
 
 function validateFragmentProps$1(fragment) {
   {
-    ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(fragment);
     var keys = Object.keys(fragment.props);
 
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i];
 
       if (key !== "children" && key !== "key") {
+        setCurrentlyValidatingElement$2(fragment);
+
         error(
           "Invalid prop `%s` supplied to `React.Fragment`. " +
             "React.Fragment can only have `key` and `children` props.",
           key
         );
 
+        setCurrentlyValidatingElement$2(null);
         break;
       }
     }
 
     if (fragment.ref !== null) {
-      error("Invalid attribute `ref` supplied to `React.Fragment`.");
-    }
+      setCurrentlyValidatingElement$2(fragment);
 
-    ReactDebugCurrentFrame$1.setCurrentlyValidatingElement(null);
+      error("Invalid attribute `ref` supplied to `React.Fragment`.");
+
+      setCurrentlyValidatingElement$2(null);
+    }
   }
 }
 
@@ -3059,6 +3463,7 @@ exports.Component = Component;
 exports.DEPRECATED_createResponder = createEventResponder;
 exports.DEPRECATED_useResponder = useResponder;
 exports.PureComponent = PureComponent;
+exports.SuspenseList = exports.unstable_SuspenseList;
 exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactSharedInternals;
 exports.block = block;
 exports.cloneElement = cloneElement$1;
@@ -3073,7 +3478,11 @@ exports.jsxDEV = jsxDEV$1;
 exports.jsxs = jsxs;
 exports.lazy = lazy;
 exports.memo = memo;
+exports.unstable_block = block;
 exports.unstable_createScope = createScope;
+exports.unstable_useDeferredValue = useDeferredValue;
+exports.unstable_useOpaqueIdentifier = useOpaqueIdentifier;
+exports.unstable_useTransition = useTransition;
 exports.unstable_withSuspenseConfig = withSuspenseConfig;
 exports.useCallback = useCallback;
 exports.useContext = useContext;

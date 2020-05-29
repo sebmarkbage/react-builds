@@ -203,12 +203,13 @@ exports.unstable_NormalPriority = 3;
 exports.unstable_Profiling = null;
 exports.unstable_UserBlockingPriority = 2;
 exports.unstable_advanceTime = function(ms) {
-  currentTime += ms;
-  null !== scheduledTimeout &&
-    timeoutTime <= currentTime &&
-    (scheduledTimeout(currentTime),
-    (timeoutTime = -1),
-    (scheduledTimeout = null));
+  "disabledLog" !== console.log.name &&
+    ((currentTime += ms),
+    null !== scheduledTimeout &&
+      timeoutTime <= currentTime &&
+      (scheduledTimeout(currentTime),
+      (timeoutTime = -1),
+      (scheduledTimeout = null)));
 };
 exports.unstable_cancelCallback = function(task) {
   task.callback = null;
@@ -402,7 +403,8 @@ exports.unstable_wrapCallback = function(callback) {
   };
 };
 exports.unstable_yieldValue = function(value) {
-  null === yieldedValues
-    ? (yieldedValues = [value])
-    : yieldedValues.push(value);
+  "disabledLog" !== console.log.name &&
+    (null === yieldedValues
+      ? (yieldedValues = [value])
+      : yieldedValues.push(value));
 };

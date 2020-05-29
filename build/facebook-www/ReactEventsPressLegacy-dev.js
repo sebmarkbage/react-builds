@@ -38,26 +38,18 @@ function error(format) {
 
 function printWarning(level, format, args) {
   {
-    var hasExistingStack =
-      args.length > 0 &&
-      typeof args[args.length - 1] === "string" &&
-      args[args.length - 1].indexOf("\n    in") === 0;
+    var React = require("react");
 
-    if (!hasExistingStack) {
-      var React = require("react");
+    var ReactSharedInternals =
+      React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
 
-      var ReactSharedInternals =
-        React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED; // Defensive in case this is fired before React is initialized.
+    if (ReactSharedInternals != null) {
+      var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+      var stack = ReactDebugCurrentFrame.getStackAddendum();
 
-      if (ReactSharedInternals != null) {
-        var ReactDebugCurrentFrame =
-          ReactSharedInternals.ReactDebugCurrentFrame;
-        var stack = ReactDebugCurrentFrame.getStackAddendum();
-
-        if (stack !== "") {
-          format += "%s";
-          args.push(stack);
-        }
+      if (stack !== "") {
+        format += "%s";
+        args.push(stack);
       }
     } // TODO: don't ignore level and pass it down somewhere too.
 
@@ -548,7 +540,13 @@ var pressResponderImpl = {
                 !ctrlKey &&
                 !altKey
               ) {
-                nativeEvent.preventDefault();
+                // Prevent spacebar press from scrolling the window
+                var key = nativeEvent.key;
+
+                if (key === " " || key === "Spacebar") {
+                  nativeEvent.preventDefault();
+                }
+
                 state.shouldPreventClick = true;
               }
             } else {
@@ -603,7 +601,12 @@ var pressResponderImpl = {
           addRootEventTypes(context, state);
         } else {
           // Prevent spacebar press from scrolling the window
-          if (isValidKeyboardEvent(nativeEvent) && nativeEvent.key === " ") {
+          var _key = nativeEvent.key;
+
+          if (
+            isValidKeyboardEvent(nativeEvent) &&
+            (_key === " " || _key === "Spacebar")
+          ) {
             nativeEvent.preventDefault();
           }
         }

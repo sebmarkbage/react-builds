@@ -21,12 +21,14 @@ var REACT_PROVIDER_TYPE = 60109,
   REACT_CONTEXT_TYPE = 60110,
   REACT_FORWARD_REF_TYPE = 60112;
 exports.Suspense = 60113;
-exports.SuspenseList = 60120;
+exports.unstable_SuspenseList = 60120;
 var REACT_MEMO_TYPE = 60115,
   REACT_LAZY_TYPE = 60116,
   REACT_BLOCK_TYPE = 60121,
   REACT_RESPONDER_TYPE = 60118,
   REACT_SCOPE_TYPE = 60119;
+exports.unstable_DebugTracingMode = 60129;
+exports.unstable_LegacyHidden = 60131;
 if ("function" === typeof Symbol && Symbol.for) {
   var symbolFor = Symbol.for;
   REACT_ELEMENT_TYPE = symbolFor("react.element");
@@ -38,12 +40,14 @@ if ("function" === typeof Symbol && Symbol.for) {
   REACT_CONTEXT_TYPE = symbolFor("react.context");
   REACT_FORWARD_REF_TYPE = symbolFor("react.forward_ref");
   exports.Suspense = symbolFor("react.suspense");
-  exports.SuspenseList = symbolFor("react.suspense_list");
+  exports.unstable_SuspenseList = symbolFor("react.suspense_list");
   REACT_MEMO_TYPE = symbolFor("react.memo");
   REACT_LAZY_TYPE = symbolFor("react.lazy");
   REACT_BLOCK_TYPE = symbolFor("react.block");
   REACT_RESPONDER_TYPE = symbolFor("react.responder");
   REACT_SCOPE_TYPE = symbolFor("react.scope");
+  exports.unstable_DebugTracingMode = symbolFor("react.debug_trace_mode");
+  exports.unstable_LegacyHidden = symbolFor("react.legacy_hidden");
 }
 var MAYBE_ITERATOR_SYMBOL = "function" === typeof Symbol && Symbol.iterator;
 function getIteratorFn(maybeIterable) {
@@ -231,8 +235,7 @@ function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
         31,
         "[object Object]" === array
           ? "object with keys {" + Object.keys(children).join(", ") + "}"
-          : array,
-        ""
+          : array
       )
     ));
   return invokeCallback;
@@ -275,14 +278,33 @@ function lazyInitializer$1(payload) {
     _render: payload.render
   };
 }
+function block(render, load) {
+  return void 0 === load
+    ? function() {
+        return { $$typeof: REACT_BLOCK_TYPE, _data: void 0, _render: render };
+      }
+    : function() {
+        return {
+          $$typeof: REACT_LAZY_TYPE,
+          _payload: { load: load, args: arguments, render: render },
+          _init: lazyInitializer$1
+        };
+      };
+}
 var ReactCurrentDispatcher = require("ReactCurrentDispatcher");
 function resolveDispatcher() {
   var dispatcher = ReactCurrentDispatcher.current;
   if (null === dispatcher) throw Error(formatProdErrorMessage(321));
   return dispatcher;
 }
-var emptyObject$1 = {},
-  ReactCurrentBatchConfig = { suspense: null };
+var emptyObject$1 = {};
+function useTransition(config) {
+  return resolveDispatcher().useTransition(config);
+}
+function useDeferredValue(value, config) {
+  return resolveDispatcher().useDeferredValue(value, config);
+}
+var ReactCurrentBatchConfig = { suspense: null };
 require("ReactFeatureFlags");
 var ReactSharedInternals = {
     ReactCurrentDispatcher: ReactCurrentDispatcher,
@@ -370,20 +392,9 @@ exports.DEPRECATED_useResponder = function(responder, listenerProps) {
   );
 };
 exports.PureComponent = PureComponent;
+exports.SuspenseList = exports.unstable_SuspenseList;
 exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactSharedInternals;
-exports.block = function(render, load) {
-  return void 0 === load
-    ? function() {
-        return { $$typeof: REACT_BLOCK_TYPE, _data: void 0, _render: render };
-      }
-    : function() {
-        return {
-          $$typeof: REACT_LAZY_TYPE,
-          _payload: { load: load, args: arguments, render: render },
-          _init: lazyInitializer$1
-        };
-      };
-};
+exports.block = block;
 exports.cloneElement = function(element, config, children) {
   if (null === element || void 0 === element)
     throw Error(formatProdErrorMessage(267, element));
@@ -502,9 +513,15 @@ exports.memo = function(type, compare) {
     compare: void 0 === compare ? null : compare
   };
 };
+exports.unstable_block = block;
 exports.unstable_createScope = function() {
   return { $$typeof: REACT_SCOPE_TYPE };
 };
+exports.unstable_useDeferredValue = useDeferredValue;
+exports.unstable_useOpaqueIdentifier = function() {
+  return resolveDispatcher().useOpaqueIdentifier();
+};
+exports.unstable_useTransition = useTransition;
 exports.unstable_withSuspenseConfig = function(scope, config) {
   var previousConfig = ReactCurrentBatchConfig.suspense;
   ReactCurrentBatchConfig.suspense = void 0 === config ? null : config;
@@ -521,9 +538,7 @@ exports.useContext = function(Context, unstable_observedBits) {
   return resolveDispatcher().useContext(Context, unstable_observedBits);
 };
 exports.useDebugValue = function() {};
-exports.useDeferredValue = function(value, config) {
-  return resolveDispatcher().useDeferredValue(value, config);
-};
+exports.useDeferredValue = useDeferredValue;
 exports.useEffect = function(create, deps) {
   return resolveDispatcher().useEffect(create, deps);
 };
@@ -548,7 +563,5 @@ exports.useRef = function(initialValue) {
 exports.useState = function(initialState) {
   return resolveDispatcher().useState(initialState);
 };
-exports.useTransition = function(config) {
-  return resolveDispatcher().useTransition(config);
-};
+exports.useTransition = useTransition;
 exports.version = "16.13.1";

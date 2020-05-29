@@ -11,7 +11,57 @@
  */
 
 "use strict";
-var ReactFlightDOMRelayClientIntegration = require("ReactFlightDOMRelayClientIntegration"),
+var ReactFlightDOMRelayClientIntegration = require("ReactFlightDOMRelayClientIntegration");
+function parseModelRecursively(response, parentObj, value) {
+  if ("string" === typeof value)
+    return (
+      "$" === value[0]
+        ? "$" === value
+          ? (response = REACT_ELEMENT_TYPE)
+          : "$" === value[1] || "@" === value[1]
+          ? (response = value.substring(1))
+          : ((value = parseInt(value.substring(1), 16)),
+            (response = getChunk(response, value)),
+            (response =
+              parentObj[0] === REACT_BLOCK_TYPE
+                ? response
+                : readChunk(response)))
+        : (response = "@" === value ? REACT_BLOCK_TYPE : value),
+      response
+    );
+  if ("object" === typeof value && null !== value) {
+    if (Array.isArray(value)) {
+      for (parentObj = 0; parentObj < value.length; parentObj++)
+        value[parentObj] = parseModelRecursively(
+          response,
+          value,
+          value[parentObj]
+        );
+      response =
+        value[0] === REACT_ELEMENT_TYPE
+          ? {
+              $$typeof: REACT_ELEMENT_TYPE,
+              type: value[1],
+              key: value[2],
+              ref: null,
+              props: value[3],
+              _owner: null
+            }
+          : value[0] === REACT_BLOCK_TYPE
+          ? {
+              $$typeof: REACT_LAZY_TYPE,
+              _payload: value,
+              _init: initializeBlock
+            }
+          : value;
+      return response;
+    }
+    for (var innerKey in value)
+      value[innerKey] = parseModelRecursively(response, value, value[innerKey]);
+  }
+  return value;
+}
+var dummy = {},
   REACT_ELEMENT_TYPE = 60103,
   REACT_LAZY_TYPE = 60116,
   REACT_BLOCK_TYPE = 60121;
@@ -21,20 +71,33 @@ if ("function" === typeof Symbol && Symbol.for) {
   REACT_LAZY_TYPE = symbolFor("react.lazy");
   REACT_BLOCK_TYPE = symbolFor("react.block");
 }
-function Chunk(status, value) {
+function Chunk(status, value, response) {
   this._status = status;
   this._value = value;
+  this._response = response;
 }
 Chunk.prototype.then = function(resolve) {
   0 === this._status
     ? (null === this._value && (this._value = []), this._value.push(resolve))
     : resolve();
 };
+function readChunk(chunk) {
+  switch (chunk._status) {
+    case 2:
+      return chunk._value;
+    case 1:
+      var value = parseModelRecursively(chunk._response, dummy, chunk._value);
+      chunk._status = 2;
+      return (chunk._value = value);
+    case 0:
+      throw chunk;
+    default:
+      throw chunk._value;
+  }
+}
 function readRoot() {
-  var rootChunk = this.rootChunk;
-  if (1 === rootChunk._status) return rootChunk._value;
-  if (0 === rootChunk._status) throw rootChunk;
-  throw rootChunk._value;
+  var chunk = getChunk(this, 0);
+  return readChunk(chunk);
 }
 function wakeChunk(listeners) {
   if (null !== listeners)
@@ -43,21 +106,20 @@ function wakeChunk(listeners) {
 function triggerErrorOnChunk(chunk, error) {
   if (0 === chunk._status) {
     var listeners = chunk._value;
-    chunk._status = 2;
+    chunk._status = 3;
     chunk._value = error;
     wakeChunk(listeners);
   }
 }
 function reportGlobalError(response, error) {
-  response.chunks.forEach(function(chunk) {
+  response._chunks.forEach(function(chunk) {
     triggerErrorOnChunk(chunk, error);
   });
 }
 function readMaybeChunk(maybeChunk) {
-  if (null == maybeChunk || !(maybeChunk instanceof Chunk)) return maybeChunk;
-  if (1 === maybeChunk._status) return maybeChunk._value;
-  if (0 === maybeChunk._status) throw maybeChunk;
-  throw maybeChunk._value;
+  return null != maybeChunk && maybeChunk instanceof Chunk
+    ? readChunk(maybeChunk)
+    : maybeChunk;
 }
 function initializeBlock(tuple) {
   var moduleMetaData = readMaybeChunk(tuple[1]);
@@ -76,77 +138,35 @@ function initializeBlock(tuple) {
     _render: moduleMetaData
   };
 }
-function parseModelFromJSON(response, targetObj, key, value) {
-  if ("string" === typeof value) {
-    if ("$" === value[0]) {
-      if ("$" === value) return REACT_ELEMENT_TYPE;
-      if ("$" === value[1] || "@" === value[1]) return value.substring(1);
-      targetObj = parseInt(value.substring(1), 16);
-      response = response.chunks;
-      key = response.get(targetObj);
-      key || ((key = new Chunk(0, null)), response.set(targetObj, key));
-      return key;
-    }
-    if ("@" === value) return REACT_BLOCK_TYPE;
-  }
-  if ("object" === typeof value && null !== value)
-    switch (value[0]) {
-      case REACT_ELEMENT_TYPE:
-        return {
-          $$typeof: REACT_ELEMENT_TYPE,
-          type: value[1],
-          key: value[2],
-          ref: null,
-          props: value[3],
-          _owner: null
-        };
-      case REACT_BLOCK_TYPE:
-        return {
-          $$typeof: REACT_LAZY_TYPE,
-          _payload: value,
-          _init: initializeBlock
-        };
-    }
-  return value;
-}
-function parseModel(response, targetObj, key, value) {
-  if ("object" === typeof value && null !== value)
-    if (Array.isArray(value))
-      for (var i = 0; i < value.length; i++)
-        value[i] = parseModel(response, value, "" + i, value[i]);
-    else for (i in value) value[i] = parseModel(response, value, i, value[i]);
-  return parseModelFromJSON(response, targetObj, key, value);
+function getChunk(response, id) {
+  var chunks = response._chunks,
+    chunk = chunks.get(id);
+  chunk || ((chunk = new Chunk(0, null, response)), chunks.set(id, chunk));
+  return chunk;
 }
 exports.close = function(response) {
   reportGlobalError(response, Error("Connection closed."));
 };
 exports.createResponse = function() {
-  var rootChunk = new Chunk(0, null),
-    chunks = new Map();
-  chunks.set(0, rootChunk);
-  return {
-    partialRow: "",
-    rootChunk: rootChunk,
-    chunks: chunks,
-    readRoot: readRoot
-  };
+  return { _chunks: new Map(), readRoot: readRoot };
 };
 exports.resolveError = function(response, id, message, stack) {
   message = Error(message);
   message.stack = stack;
-  response = response.chunks;
-  (stack = response.get(id))
-    ? triggerErrorOnChunk(stack, message)
-    : response.set(id, new Chunk(2, message));
+  stack = response._chunks;
+  var chunk = stack.get(id);
+  chunk
+    ? triggerErrorOnChunk(chunk, message)
+    : stack.set(id, new Chunk(3, message, response));
 };
-exports.resolveModel = function(response, id, json) {
-  json = parseModel(response, {}, "", json);
-  var chunks = response.chunks;
-  (response = chunks.get(id))
-    ? 0 === response._status &&
-      ((id = response._value),
-      (response._status = 1),
-      (response._value = json),
-      wakeChunk(id))
-    : chunks.set(id, new Chunk(1, json));
+exports.resolveModel = function(response, id, model) {
+  var chunks = response._chunks,
+    chunk = chunks.get(id);
+  chunk
+    ? 0 === chunk._status &&
+      ((response = chunk._value),
+      (chunk._status = 1),
+      (chunk._value = model),
+      wakeChunk(response))
+    : chunks.set(id, new Chunk(1, model, response));
 };

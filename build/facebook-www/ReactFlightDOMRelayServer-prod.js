@@ -54,6 +54,10 @@ function convertModelToJSON(request, parent, key, model) {
   }
   return parent;
 }
+function processModelChunk(request, id, model) {
+  request = convertModelToJSON(request, {}, "", model);
+  return { type: "json", id: id, json: request };
+}
 function writeChunk(destination, chunk) {
   "json" === chunk.type
     ? ReactFlightDOMRelayServerIntegration.emitModel(
@@ -103,6 +107,15 @@ function createRequest(model, destination, bundlerConfig) {
   });
   pingedSegments.push(destination);
   return request;
+}
+function attemptResolveElement(element) {
+  var type = element.type,
+    props = element.props;
+  if ("function" === typeof type) return type(props);
+  if ("string" === typeof type || type[0] === REACT_SERVER_BLOCK_TYPE)
+    return [REACT_ELEMENT_TYPE, type, element.key, element.props];
+  if (type === REACT_FRAGMENT_TYPE) return element.props.children;
+  throw Error(formatProdErrorMessage(351));
 }
 function createSegment(request, query) {
   var segment = {
@@ -178,21 +191,28 @@ function resolveModelToJSON(request, parent, key, value) {
     null !== value &&
     value.$$typeof === REACT_ELEMENT_TYPE;
 
-  )
-    if (
-      ((request = value),
-      (parent = request.type),
-      (key = request.props),
-      "function" === typeof parent)
-    )
-      value = parent(key);
-    else if (
-      "string" === typeof parent ||
-      parent[0] === REACT_SERVER_BLOCK_TYPE
-    )
-      value = [REACT_ELEMENT_TYPE, parent, request.key, request.props];
-    else if (parent === REACT_FRAGMENT_TYPE) value = request.props.children;
-    else throw Error(formatProdErrorMessage(351));
+  ) {
+    parent = value;
+    try {
+      value = attemptResolveElement(parent);
+    } catch (x$4) {
+      if (
+        "object" === typeof x$4 &&
+        null !== x$4 &&
+        "function" === typeof x$4.then
+      )
+        return (
+          request.pendingChunks++,
+          (request = createSegment(request, function() {
+            return value;
+          })),
+          (parent = request.ping),
+          x$4.then(parent, parent),
+          "$" + request.id.toString(16)
+        );
+      throw x$4;
+    }
+  }
   return value;
 }
 function emitErrorChunk(request, id, error) {
@@ -211,46 +231,55 @@ function emitErrorChunk(request, id, error) {
     json: { message: message, stack: stack }
   });
 }
-function performWork(request$jscomp$0) {
-  var pingedSegments = request$jscomp$0.pingedSegments;
-  request$jscomp$0.pingedSegments = [];
-  for (var i = 0; i < pingedSegments.length; i++) {
-    var segment = pingedSegments[i];
-    var request = request$jscomp$0,
-      query = segment.query;
-    try {
-      var value = query(),
-        id = segment.id,
-        json = convertModelToJSON(request, {}, "", value);
-      request.completedJSONChunks.push({ type: "json", id: id, json: json });
-    } catch (x) {
-      "object" === typeof x && null !== x && "function" === typeof x.then
-        ? ((segment = segment.ping), x.then(segment, segment))
-        : emitErrorChunk(request, segment.id, x);
-    }
+function retrySegment(request, segment) {
+  var query = segment.query,
+    value;
+  try {
+    for (
+      value = query();
+      "object" === typeof value &&
+      null !== value &&
+      value.$$typeof === REACT_ELEMENT_TYPE;
+
+    )
+      (query = value),
+        (segment.query = function() {
+          return value;
+        }),
+        (value = attemptResolveElement(query));
+    var processedChunk = processModelChunk(request, segment.id, value);
+    request.completedJSONChunks.push(processedChunk);
+  } catch (x) {
+    "object" === typeof x && null !== x && "function" === typeof x.then
+      ? ((request = segment.ping), x.then(request, request))
+      : emitErrorChunk(request, segment.id, x);
   }
-  if (request$jscomp$0.flowing && !reentrant) {
+}
+function performWork(request) {
+  var pingedSegments = request.pingedSegments;
+  request.pingedSegments = [];
+  for (var i = 0; i < pingedSegments.length; i++)
+    retrySegment(request, pingedSegments[i]);
+  if (request.flowing && !reentrant) {
     reentrant = !0;
-    pingedSegments = request$jscomp$0.destination;
+    pingedSegments = request.destination;
     try {
-      var jsonChunks = request$jscomp$0.completedJSONChunks;
+      var jsonChunks = request.completedJSONChunks;
       for (i = 0; i < jsonChunks.length; i++)
         if (
-          (request$jscomp$0.pendingChunks--,
-          !writeChunk(pingedSegments, jsonChunks[i]))
+          (request.pendingChunks--, !writeChunk(pingedSegments, jsonChunks[i]))
         ) {
-          request$jscomp$0.flowing = !1;
+          request.flowing = !1;
           i++;
           break;
         }
       jsonChunks.splice(0, i);
-      var errorChunks = request$jscomp$0.completedErrorChunks;
+      var errorChunks = request.completedErrorChunks;
       for (i = 0; i < errorChunks.length; i++)
         if (
-          (request$jscomp$0.pendingChunks--,
-          !writeChunk(pingedSegments, errorChunks[i]))
+          (request.pendingChunks--, !writeChunk(pingedSegments, errorChunks[i]))
         ) {
-          request$jscomp$0.flowing = !1;
+          request.flowing = !1;
           i++;
           break;
         }
@@ -258,7 +287,7 @@ function performWork(request$jscomp$0) {
     } finally {
       reentrant = !1;
     }
-    0 === request$jscomp$0.pendingChunks &&
+    0 === request.pendingChunks &&
       ReactFlightDOMRelayServerIntegration.close(pingedSegments);
   }
 }

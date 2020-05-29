@@ -274,9 +274,10 @@ var PressResponder = React.DEPRECATED_createResponder("Press", {
         case "mousedown":
         case "touchstart":
           if (isPressed)
-            isValidKeyboardEvent(nativeEvent) &&
-              " " === nativeEvent.key &&
-              nativeEvent.preventDefault();
+            (event = nativeEvent.key),
+              !isValidKeyboardEvent(nativeEvent) ||
+                (" " !== event && "Spacebar" !== event) ||
+                nativeEvent.preventDefault();
           else {
             var isTouchEvent = "touchstart" === type,
               isPointerEvent = "pointerdown" === type,
@@ -296,7 +297,9 @@ var PressResponder = React.DEPRECATED_createResponder("Press", {
                     metaKey ||
                     isKeyboardEvent ||
                     type ||
-                    (nativeEvent.preventDefault(),
+                    ((type = nativeEvent.key),
+                    (" " !== type && "Spacebar" !== type) ||
+                      nativeEvent.preventDefault(),
                     (state.shouldPreventClick = !0));
                 } else break;
               state.pointerType = pointerType;

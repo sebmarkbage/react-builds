@@ -537,11 +537,11 @@ var maxSigned31BitInt = 1073741823; // Times out immediately
 
 var IMMEDIATE_PRIORITY_TIMEOUT = -1; // Eventually times out
 
-var USER_BLOCKING_PRIORITY = 250;
+var USER_BLOCKING_PRIORITY_TIMEOUT = 250;
 var NORMAL_PRIORITY_TIMEOUT = 5000;
 var LOW_PRIORITY_TIMEOUT = 10000; // Never times out
 
-var IDLE_PRIORITY = maxSigned31BitInt; // Tasks are stored on a min heap
+var IDLE_PRIORITY_TIMEOUT = maxSigned31BitInt; // Tasks are stored on a min heap
 
 var taskQueue = [];
 var timerQueue = []; // Incrementing id counter. Used to maintain insertion order.
@@ -780,10 +780,10 @@ function timeoutForPriorityLevel(priorityLevel) {
       return IMMEDIATE_PRIORITY_TIMEOUT;
 
     case UserBlockingPriority:
-      return USER_BLOCKING_PRIORITY;
+      return USER_BLOCKING_PRIORITY_TIMEOUT;
 
     case IdlePriority:
-      return IDLE_PRIORITY;
+      return IDLE_PRIORITY_TIMEOUT;
 
     case LowPriority:
       return LOW_PRIORITY_TIMEOUT;
